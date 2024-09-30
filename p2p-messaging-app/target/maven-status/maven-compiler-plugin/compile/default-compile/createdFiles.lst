@@ -1,5 +1,5 @@
-com/p2pmessagingapp/App.class
-com/p2pmessagingapp/ServerThread.class
-com/p2pmessagingapp/ServerThreadThread.class
-com/p2pmessagingapp/Peer.class
-com/p2pmessagingapp/PeerThread.class
+com\p2pmessagingapp\ServerThread.class
+com\p2pmessagingapp\Peer.class
+com\p2pmessagingapp\PeerThread.class
+com\p2pmessagingapp\ServerThreadThread.class
+com\p2pmessagingapp\App.class

@@ -1,54 +1,61 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.p2pmessagingapp.AppTest" time="0.175" tests="1" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="com.p2pmessagingapp.AppTest" time="0.041" tests="1" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="17"/>
-    <property name="sun.jnu.encoding" value="UTF-8"/>
-    <property name="java.class.path" value="/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/test-classes:/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/classes:/home/gustavo/.m2/repository/junit/junit/4.11/junit-4.11.jar:/home/gustavo/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/home/gustavo/.m2/repository/javax/json/javax.json-api/1.1.4/javax.json-api-1.1.4.jar:/home/gustavo/.m2/repository/org/glassfish/javax.json/1.1.4/javax.json-1.1.4.jar:"/>
-    <property name="java.vm.vendor" value="Private Build"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="Cp1252"/>
+    <property name="java.class.path" value="C:\Users\gusta\OneDrive\Ambiente de Trabalho\Mestrado - FCUL\PSD\Project\p2p-messaging-app\target\test-classes;C:\Users\gusta\OneDrive\Ambiente de Trabalho\Mestrado - FCUL\PSD\Project\p2p-messaging-app\target\classes;C:\Users\gusta\.m2\repository\junit\junit\4.11\junit-4.11.jar;C:\Users\gusta\.m2\repository\org\hamcrest\hamcrest-core\1.3\hamcrest-core-1.3.jar;C:\Users\gusta\.m2\repository\javax\json\javax.json-api\1.1.4\javax.json-api-1.1.4.jar;C:\Users\gusta\.m2\repository\org\glassfish\javax.json\1.1.4\javax.json-1.1.4.jar;C:\Users\gusta\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\3.0.0\jakarta.xml.bind-api-3.0.0.jar;C:\Users\gusta\.m2\repository\com\sun\activation\jakarta.activation\2.0.0\jakarta.activation-2.0.0.jar;"/>
+    <property name="java.vm.vendor" value="Eclipse Adoptium"/>
     <property name="sun.arch.data.model" value="64"/>
-    <property name="java.vendor.url" value="Unknown"/>
-    <property name="os.name" value="Linux"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="https://adoptium.net/"/>
+    <property name="user.timezone" value="Europe/Lisbon"/>
+    <property name="os.name" value="Windows 11"/>
     <property name="java.vm.specification.version" value="17"/>
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
-    <property name="sun.boot.library.path" value="/usr/lib/jvm/java-17-openjdk-amd64/lib"/>
-    <property name="sun.java.command" value="/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/surefire/surefirebooter11987099973874243943.jar /mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/surefire 2024-09-26T19-21-59_859-jvmRun1 surefire646201081925126312tmp surefire_06445378781207791976tmp"/>
+    <property name="user.country" value="PT"/>
+    <property name="sun.boot.library.path" value="C:\Java\JAVA_HOME\bin"/>
+    <property name="sun.java.command" value="C:\Users\gusta\AppData\Local\Temp\surefire10517642247272039031\surefirebooter4699378873210932577.jar C:\Users\gusta\AppData\Local\Temp\surefire10517642247272039031 2024-10-01T00-36-10_979-jvmRun1 surefire15558691789059116611tmp surefire_07506633195530420335tmp"/>
     <property name="jdk.debug" value="release"/>
-    <property name="surefire.test.class.path" value="/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/test-classes:/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/classes:/home/gustavo/.m2/repository/junit/junit/4.11/junit-4.11.jar:/home/gustavo/.m2/repository/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar:/home/gustavo/.m2/repository/javax/json/javax.json-api/1.1.4/javax.json-api-1.1.4.jar:/home/gustavo/.m2/repository/org/glassfish/javax.json/1.1.4/javax.json-1.1.4.jar:"/>
+    <property name="surefire.test.class.path" value="C:\Users\gusta\OneDrive\Ambiente de Trabalho\Mestrado - FCUL\PSD\Project\p2p-messaging-app\target\test-classes;C:\Users\gusta\OneDrive\Ambiente de Trabalho\Mestrado - FCUL\PSD\Project\p2p-messaging-app\target\classes;C:\Users\gusta\.m2\repository\junit\junit\4.11\junit-4.11.jar;C:\Users\gusta\.m2\repository\org\hamcrest\hamcrest-core\1.3\hamcrest-core-1.3.jar;C:\Users\gusta\.m2\repository\javax\json\javax.json-api\1.1.4\javax.json-api-1.1.4.jar;C:\Users\gusta\.m2\repository\org\glassfish\javax.json\1.1.4\javax.json-1.1.4.jar;C:\Users\gusta\.m2\repository\jakarta\xml\bind\jakarta.xml.bind-api\3.0.0\jakarta.xml.bind-api-3.0.0.jar;C:\Users\gusta\.m2\repository\com\sun\activation\jakarta.activation\2.0.0\jakarta.activation-2.0.0.jar;"/>
     <property name="sun.cpu.endian" value="little"/>
-    <property name="user.home" value="/home/gustavo"/>
-    <property name="user.language" value="en"/>
+    <property name="user.home" value="C:\Users\gusta"/>
+    <property name="user.language" value="pt"/>
     <property name="java.specification.vendor" value="Oracle Corporation"/>
     <property name="java.version.date" value="2024-01-16"/>
-    <property name="java.home" value="/usr/lib/jvm/java-17-openjdk-amd64"/>
-    <property name="file.separator" value="/"/>
-    <property name="basedir" value="/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app"/>
-    <property name="java.vm.compressedOopsMode" value="32-bit"/>
+    <property name="java.home" value="C:\Java\JAVA_HOME"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="C:\Users\gusta\OneDrive\Ambiente de Trabalho\Mestrado - FCUL\PSD\Project\p2p-messaging-app"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
     <property name="line.separator" value="&#10;"/>
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
-    <property name="surefire.real.class.path" value="/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/target/surefire/surefirebooter11987099973874243943.jar"/>
+    <property name="surefire.real.class.path" value="C:\Users\gusta\AppData\Local\Temp\surefire10517642247272039031\surefirebooter4699378873210932577.jar"/>
+    <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
-    <property name="java.runtime.version" value="17.0.10+7-Ubuntu-122.04.1"/>
-    <property name="user.name" value="gustavo"/>
-    <property name="path.separator" value=":"/>
-    <property name="os.version" value="5.15.153.1-microsoft-standard-WSL2"/>
+    <property name="java.runtime.version" value="17.0.10+7"/>
+    <property name="user.name" value="gusta"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
     <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
-    <property name="file.encoding" value="UTF-8"/>
+    <property name="file.encoding" value="Cp1252"/>
     <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
-    <property name="localRepository" value="/home/gustavo/.m2/repository"/>
-    <property name="java.vendor.url.bug" value="Unknown"/>
-    <property name="java.io.tmpdir" value="/tmp"/>
+    <property name="java.vendor.version" value="Temurin-17.0.10+7"/>
+    <property name="localRepository" value="C:\Users\gusta\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/adoptium/adoptium-support/issues"/>
+    <property name="java.io.tmpdir" value="C:\Users\gusta\AppData\Local\Temp\"/>
     <property name="java.version" value="17.0.10"/>
-    <property name="user.dir" value="/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app"/>
+    <property name="user.dir" value="C:\Users\gusta\OneDrive\Ambiente de Trabalho\Mestrado - FCUL\PSD\Project\p2p-messaging-app"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
-    <property name="native.encoding" value="UTF-8"/>
-    <property name="java.library.path" value="/usr/java/packages/lib:/usr/lib/x86_64-linux-gnu/jni:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="native.encoding" value="Cp1252"/>
+    <property name="java.library.path" value="C:\Java\JAVA_HOME\bin;C:\Windows\Sun\Java\bin;C:\Windows\system32;C:\Windows;C:\Java\JAVA_HOME\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files (x86)\dotnet\;C:\Java\M2_HOME\bin;C:\Java\Git\cmd;C:\Program Files\nodejs\;C:\ProgramData\chocolatey\bin;;C:\Program Files\Docker\Docker\resources\bin;C:\Users\gusta\AppData\Local\Programs\Python\Python311\Scripts\;C:\Users\gusta\AppData\Local\Programs\Python\Python311\;C:\Users\gusta\AppData\Local\Microsoft\WindowsApps;C:\Users\gusta\AppData\Local\Programs\Microsoft VS Code\bin;C:\Program Files\JetBrains\PhpStorm 2023.2.2\bin;;C:\Program Files\JetBrains\IntelliJ IDEA 2023.3.4\bin;;C:\Users\gusta\AppData\Roaming\npm;C:\Program Files\JetBrains\WebStorm 2023.3.5\bin;;."/>
     <property name="java.vm.info" value="mixed mode, sharing"/>
-    <property name="java.vendor" value="Private Build"/>
-    <property name="java.vm.version" value="17.0.10+7-Ubuntu-122.04.1"/>
+    <property name="java.vendor" value="Eclipse Adoptium"/>
+    <property name="java.vm.version" value="17.0.10+7"/>
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="61.0"/>
   </properties>
-  <testcase name="shouldAnswerWithTrue" classname="com.p2pmessagingapp.AppTest" time="0.004"/>
+  <testcase name="shouldAnswerWithTrue" classname="com.p2pmessagingapp.AppTest" time="0.003"/>
 </testsuite>

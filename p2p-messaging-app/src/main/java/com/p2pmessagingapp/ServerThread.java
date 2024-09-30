@@ -1,24 +1,29 @@
 package com.p2pmessagingapp;
 
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+
 public class ServerThread extends Thread {
 
-    private ServerSocket serverSocket;
+    SSLServerSocketFactory sslServerSocketFactory;
+    private SSLServerSocket sslServerSocket = null;
+
     private Set<ServerThreadThread> serverThreadThreads = new HashSet<ServerThreadThread>();
 
     public ServerThread(String portNum) throws IOException {
-        serverSocket = new ServerSocket(Integer.valueOf(portNum));        
+        this.sslServerSocketFactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+        sslServerSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket(Integer.valueOf(portNum));        
     }
 
     public void run() {
         try {
 
            while(true) {  // Infinite loop to keep the server running and accepting client connections.
-            ServerThreadThread serverThreadThread = new ServerThreadThread(serverSocket.accept(), this);
+            ServerThreadThread serverThreadThread = new ServerThreadThread(sslServerSocket.accept(), this);
             // Accepts a new client connection and creates a thread to manage it
 
             serverThreadThreads.add(serverThreadThread); 

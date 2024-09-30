@@ -21,7 +21,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
-import java.net.Socket;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -29,13 +28,19 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import javax.crypto.Cipher;
 
-import javax.xml.bind.DatatypeConverter;
+import javax.crypto.Cipher;
 import javax.json.Json;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+
+import jakarta.xml.bind.DatatypeConverter;
 
 public class Peer {
-    Socket socket = null;
+
+    private SSLSocketFactory sslSocketFactory;
+    private SSLSocket sslSocket = null;
+
     byte[] otherPeerPubKey;
     static KeyPair keys;
     public static void main(String[] args) throws Exception {
@@ -43,10 +48,11 @@ public class Peer {
         String[] values;
         ServerThread serverThread;
         BufferedReader bufferedReader;
+
+        System.out.println("=> Please enter your id & port below:");
                 
         while (true) {
             bufferedReader = new BufferedReader(new InputStreamReader(System.in));
-            System.out.println("=> Please enter your id & port below:");
             values = bufferedReader.readLine().split(" "); // Reads and splits user input details
             boolean verificationStatus = fileAndPortVerification(values);
             if (verificationStatus) {
@@ -60,6 +66,10 @@ public class Peer {
         createClientFile(values[0], values[1],keys.getPublic().getEncoded());
 
         new Peer().updateListenToPeers(bufferedReader,values[0], serverThread);
+    }
+
+    public Peer() {
+        this.sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
     }
        
     
@@ -89,12 +99,12 @@ public class Peer {
                 String[] address = inputValues[i].split(":");
 
                 try {  // Create a socket and start a PeerThread for communication
-                    socket = new Socket(address[0], Integer.valueOf(address[1]));
-                    peer = new PeerThread(socket,keys.getPrivate());
+                    sslSocket =  (SSLSocket) sslSocketFactory.createSocket(address[0], Integer.valueOf(address[1]));
+                    peer = new PeerThread(sslSocket,keys.getPrivate());
                     peer.start(); // Initiates a PeerThread for communication with the connected peer
 
                 } catch (Exception e) { // Close the socket if it exists; print "invalid input" if not.
-                    if (socket != null) socket.close();
+                    if (sslSocket != null) sslSocket.close();
                     else System.out.println("invalid input");
                 }
             }
@@ -129,7 +139,7 @@ public class Peer {
 
                 } else if (message.equals("c")) { //change the peer
                     endConnection();
-                    this.socket.close();
+                    this.sslSocket.close();
                     updateListenToPeers(bufferedReader, id, serverThread);
                
                 } 
@@ -215,6 +225,7 @@ public class Peer {
             System.out.println("=> " + errorMessage + " already in use, please insert a different " + errorMessage + ":");
             return false;
     }
+
     private static void sendPubKey(String id, ServerThread serverThread){
         StringWriter stringWriter = new StringWriter();
         byte[] pubKeytoSend = keys.getPublic().getEncoded();
@@ -252,4 +263,3 @@ public class Peer {
         
     }
 }
-

@@ -5,23 +5,32 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+
 public class ServerThreadThread extends Thread {
 
     private ServerThread serverThread;
-    private Socket socket;
+    private SSLSocketFactory sslSocketFactory;
+    private SSLSocket sslSocket;
     private PrintWriter printWriter;
 
-    public ServerThreadThread(Socket socket, ServerThread serverThread) {
+    public ServerThreadThread(SSLSocket socket, ServerThread serverThread) {
+        this.sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
         this.serverThread = serverThread;
-        this.socket = socket;
+        this.sslSocket = socket;
     }
 
-    public void run() {
+    public ServerThreadThread(Socket accept, ServerThread serverThread2) {
+		//TODO Auto-generated constructor stub
+	}
+
+	public void run() {
         try {
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(this.sslSocket.getInputStream()));
             // Creates a BufferedReader to read incoming messages from the client socket.
 
-          /**??? para que */  this.printWriter = new PrintWriter(socket.getOutputStream(), true);  /**??? */ 
+          /**??? para que */  this.printWriter = new PrintWriter(sslSocket.getOutputStream(), true);  /**??? */ 
             // Initializes a PrintWriter to send messages to the client, enabling auto-flush.
 
             while(true) 
