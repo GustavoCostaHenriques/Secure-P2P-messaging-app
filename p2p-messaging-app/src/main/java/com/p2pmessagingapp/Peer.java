@@ -8,6 +8,7 @@
  * tentar meter em SSL eu tentei mas estava meio dificil 
  * 
  */
+// TODO ter um desconectar peer e ligar a outro meter coneçao tipo um gajo quer falar e falo logo n tem de esperar que i outro se ligue 
 
 
 package com.p2pmessagingapp;
@@ -34,7 +35,7 @@ import javax.xml.bind.DatatypeConverter;
 import javax.json.Json;
 
 public class Peer {
-
+    Socket socket = null;
     byte[] otherPeerPubKey;
     static KeyPair keys;
     public static void main(String[] args) throws Exception {
@@ -86,7 +87,6 @@ public class Peer {
 
             for (int i = 0; i < inputValues.length; i++) {
                 String[] address = inputValues[i].split(":");
-                Socket socket = null;
 
                 try {  // Create a socket and start a PeerThread for communication
                     socket = new Socket(address[0], Integer.valueOf(address[1]));
@@ -128,6 +128,8 @@ public class Peer {
                     break;
 
                 } else if (message.equals("c")) { //change the peer
+                    endConnection();
+                    this.socket.close();
                     updateListenToPeers(bufferedReader, id, serverThread);
                
                 } 
@@ -244,6 +246,10 @@ public class Peer {
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encodedPbKey);
         return keyFactory.generatePublic(publicKeySpec);
+    }
+
+    private void endConnection(){
+        
     }
 }
 
