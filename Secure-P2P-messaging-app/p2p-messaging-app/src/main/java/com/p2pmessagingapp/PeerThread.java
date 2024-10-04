@@ -84,28 +84,11 @@ public class PeerThread extends Thread {
         return decryptedBytes;
     }
 
-    private static boolean checkHash(JsonObject jObject, String text) throws Exception {
-        String sentHash = bytesToString(decryptPKRSA(jObject.getString("hash"), receiverPKey));
-        String messageHash = makeHash(text);
-        System.out.println(sentHash);
-        System.out.println(" ");
-        System.err.println(messageHash);
-        return sentHash.equals(messageHash);
-    }
-
     public static String bytesToString(byte[] bytes) {
         return Base64.getEncoder().encodeToString(bytes);
     }
 
-    private static String makeHash(String text) throws NoSuchAlgorithmException {
-        System.out.println(text);
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
-        String encoded = Base64.getEncoder().encodeToString(hash);
-        return encoded;
-    }
-
-public static boolean Verify_Digital_Signature( byte[] input, byte[] signatureToVerify, PublicKey key) throws Exception { 
+    public static boolean Verify_Digital_Signature( byte[] input, byte[] signatureToVerify, PublicKey key) throws Exception { 
         Signature signature = Signature.getInstance( "SHA256withRSA"); 
         signature.initVerify(key); 
         signature.update(input); 

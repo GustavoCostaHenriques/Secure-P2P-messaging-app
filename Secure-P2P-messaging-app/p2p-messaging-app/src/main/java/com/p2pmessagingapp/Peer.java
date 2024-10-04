@@ -39,7 +39,7 @@ public class Peer {
         String[] values;
         ServerThread serverThread;
         BufferedReader bufferedReader;
-        System.out.println("=> Please enter your id & port below:");
+        System.out.println("=> Please enter your id & port below:(Ex: Valeta 6969) ");
 
         while (true) {
             bufferedReader = new BufferedReader(new InputStreamReader(System.in));
@@ -67,35 +67,56 @@ public class Peer {
         String input = null;
         String[] inputValues = null;
         PeerThread peer = null;
+    
+        // Continue prompting until the user enters a valid connection string in the format 'localhost:port'
         while (!validConnection) {
-            System.out.println("Enter localhost:port");
-            System.out.println(" peers to receive messages from(s to skip):");
+            System.out.println("Enter localhost:port to connect to peers (s to skip):");
             input = bufferedReader.readLine();
+    
+            if (input.equals("s")) {  // If user chooses to skip, break the loop
+                break;
+            }
+    
+            // Check if the input has the correct format 'localhost:port'
             long count = input.chars().filter(c -> c == ':').count();
-            if (count > 1) {
-                System.out.println("=> error: you can only connect to one user, please try again");
-            } else {
-                inputValues = input.split(" "); // Split input by spaces into host:port pairs
-                validConnection = true;
-            }
-        }
-
-        if (!input.equals("s")) {
-            for (String value : inputValues) {
-                String[] address = value.split(":");
-                try {  // Create a socket and start a PeerThread for communication
-                    socket = new Socket(address[0], Integer.valueOf(address[1]));
-                    peer = new PeerThread(socket, keys.getPrivate());
-                    peer.start(); // Initiates a PeerThread for communication with the connected peer
-                } catch (Exception e) { // Close the socket if it exists; print "invalid input" if not.
-                    if (socket != null) socket.close();
-                    else System.out.println("invalid input");
+    
+            if (count == 1) {
+                inputValues = input.split(":"); // Split input into 'localhost' and 'port'
+    
+                if (inputValues.length == 2) {
+                    try {
+                        // Validate the port format and range
+                        int port = Integer.parseInt(inputValues[1]);
+                        if (port > 0 && port <= 65535) {
+                            // If the port is valid, try to establish the connection
+                            socket = new Socket(inputValues[0], port);
+                            peer = new PeerThread(socket, keys.getPrivate());
+                            peer.start(); // Start PeerThread to communicate with the peer connected
+                            validConnection = true; // Connection established successfully
+                        } else {
+                            System.out.println("=> error: port must be a number between 1 and 65535.");
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("=> error: port must be a valid number.");
+                    } catch (IOException e) {
+                        System.out.println("=> error: connection failed, please try again.");
+                        // No need to close socket here as it's not established yet
+                    }
+                } else {
+                    System.out.println("=> error: incorrect format, please enter 'localhost:port'");
                 }
+            } else {
+                System.out.println("=> error: incorrect format, please enter 'localhost:port'");
             }
         }
-        // Handles user communication with connected peers.
-        communicate(bufferedReader, id, serverThread, peer);
+    
+        // If a valid connection was established, handle communication
+        if (validConnection) {
+            communicate(bufferedReader, id, serverThread, peer);
+        }
     }
+    
+
 
     public void communicate(BufferedReader bufferedReader, String id, ServerThread serverThread, PeerThread peer) {
         try {
@@ -104,6 +125,7 @@ public class Peer {
             boolean pubKeySent = false;
             while (flag) {
                 String message = bufferedReader.readLine();
+                System.out.println("Message sended: " + message); // Debug print
 
                 if (message.equals("e")) { // exit the communication
                     flag = false;
@@ -117,12 +139,10 @@ public class Peer {
                     pubKeySent = true;
                 } else {
                     if (pubKeySent) {
-                        System.out.println(peer.getReceiverPKey().toString());
+                        // System.out.println(peer.getReceiverPKey().toString());
                         byte[] receiverPKey = peer.getReceiverPKey();
                         StringWriter stringWriter = new StringWriter();
                         String hash = bytesToString(Create_Digital_Signature(stringToBytes(message), keys.getPrivate()));
-                        //String hash = makeHash(message);
-                        //hash = bytesToString(encryptPrivRSA(hash, keys.getPrivate()));
                         message = bytesToString(encryptPubRSA(message, receiverPKey));
                         // Creates a JSON object with the user's ID and message for transmission.
                         Json.createWriter(stringWriter).writeObject(Json.createObjectBuilder()
@@ -193,19 +213,38 @@ public class Peer {
     }
 
     private static boolean fileAndPortVerification(String[] values) {
+        // Check if the correct number of values was provided
+        if (values.length != 2) {
+            System.out.println("=> error: input must be in the format 'id port' (e.g., Valeta 6969).");
+            return false;
+        }
+    
         String errorMessage = "";
-        File filename = new File("clients/" + values[0]); // verify if the client already exists
+        File filename = new File("clients/" + values[0]); // Check if the ID already exists
         if (filename.exists()) errorMessage = "ID";
-
+    
+        // Check if the second value (port) is a valid number
+        try {
+            int port = Integer.parseInt(values[1]);
+            if (port <= 0 || port > 65535) { // Limit the port to a range between 1 and 65535
+                System.out.println("=> error: port must be a number between 1 and 65535.");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("=> error: port must be a valid number.");
+            return false;
+        }
+    
+        // Check if the port is already in use
         File folder = new File("clients");
         if (folder.exists() && folder.isDirectory()) {
-            File[] files = folder.listFiles(); // iterate the files
+            File[] files = folder.listFiles(); // Iterate through the files
             if (files != null) {
                 for (File file : files) {
                     if (file.isFile()) {
                         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                            String filePort = reader.readLine(); // Reads the file content
-                            if (filePort.equals(values[1])) { // check if the port already exists
+                            String filePort = reader.readLine(); // Read the file content (port)
+                            if (filePort.equals(values[1])) { // Check if the port already exists
                                 if (errorMessage.equals("")) errorMessage = "Port";
                                 else errorMessage = "ID and Port";
                             }
@@ -216,10 +255,13 @@ public class Peer {
                 }
             }
         }
+    
         if (errorMessage.equals("")) return true;
         System.out.println("=> " + errorMessage + " already in use, please insert a different " + errorMessage + ":");
         return false;
     }
+    
+    
 
     private static void sendPubKey(String id, ServerThread serverThread) {
         StringWriter stringWriter = new StringWriter();
