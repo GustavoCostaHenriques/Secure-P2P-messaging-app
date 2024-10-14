@@ -1,5 +1,6 @@
-/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/ServerThread.java
+/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/User.java
 /mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/Peer.java
+/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/PeerServer.java
 /mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/App.java
-/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/ServerThreadThread.java
-/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/PeerThread.java
+/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/PeerHandler.java
+/mnt/c/Users/gusta/OneDrive/Ambiente de Trabalho/Mestrado - FCUL/PSD/Project/p2p-messaging-app/src/main/java/com/p2pmessagingapp/Message.java

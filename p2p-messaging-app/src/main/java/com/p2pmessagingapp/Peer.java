@@ -3,43 +3,42 @@ package com.p2pmessagingapp;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.StringWriter;
-import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
+import java.io.OutputStream;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.Signature;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
-import javax.crypto.Cipher;
-import javax.json.Json;
-import javax.xml.bind.DatatypeConverter; // Import regular Socket instead of SSLSocket
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 public class Peer {
     
-    private Socket socket; // Change from SSLSocket to Socket
-    byte[] otherPeerPubKey;
-    static KeyPair keys;
+    private static SSLSocket sslSocket; // Change from SSLSocket to Socket
+    private final static List<User> Users = new ArrayList<>(); // Creates a list of users
+    private static String[] values;
+    private static PeerServer serverThread;
+    private static BufferedReader bufferedReader;
+
 
     public static void main(String[] args) throws Exception {
+        addShutdownHook(); // Delete client and port files/directories by pressing 'Control + C'
 
-        String[] values;
-        ServerThread serverThread;
-        BufferedReader bufferedReader;
         System.out.println("=> Please enter your id & port below:(Ex: Valeta 6969) ");
-
         while (true) {
             bufferedReader = new BufferedReader(new InputStreamReader(System.in));
             values = bufferedReader.readLine().split(" "); // Reads and splits user input details
@@ -48,120 +47,138 @@ public class Peer {
                 break;
             }
         }
-        serverThread = new ServerThread(values[1]);
+        serverThread = new PeerServer(values[0], Integer.parseInt(values[1]));
         serverThread.start();
-        keys = generateKeys();
-        System.out.println(keys.getPublic().getFormat() + " format " + keys.getPublic().getAlgorithm() + " ALgo");
-        createClientFile(values[0], values[1], keys.getPublic().getEncoded());
-        createUsersFile(values[1]);
-        new Peer().updateListenToPeers(bufferedReader, values[0], serverThread);
+
+        createUserAtributtes(values[0], Integer.parseInt(values[1]));
+
+        askForcommunication(bufferedReader, values[0], serverThread);
+        keepProgramRunning();
+
     }
 
-    public Peer() {
-        // No need for SSLSocketFactory now
+    private static void createUserAtributtes(String address, int port) {
+        createPortsFile(port);
+        createSSLSocket("localhost", port);
+        createClientFile(address, port);
+        createUser(address, port);
     }
 
-    public void updateListenToPeers(BufferedReader bufferedReader, String id, ServerThread serverThread) throws Exception {
-        boolean validConnection = false;
-        String input = null;
-        String[] inputValues = null;
-        PeerThread peer = null;
-    
-        // Continue prompting until the user enters a valid connection string in the format 'localhost:port'
-        while (!validConnection) {
-            System.out.println("Enter localhost:port to connect to peers (s to skip):");
-            input = bufferedReader.readLine();
-    
-            if (input.equals("s")) {  // If user chooses to skip, break the loop
-                break;
-            }
-    
-            // Check if the input has the correct format 'localhost:port'
-            long count = input.chars().filter(c -> c == ':').count();
-    
-            if (count == 1) {
-                inputValues = input.split(":"); // Split input into 'localhost' and 'port'
-    
-                if (inputValues.length == 2) {
-                    try {
-                        // Validate the port format and range
-                        int port = Integer.parseInt(inputValues[1]);
-                        if (port > 0 && port <= 65535) {
-                            // If the port is valid, try to establish the connection
-                            socket = new Socket(inputValues[0], port);
-                            peer = new PeerThread(socket, keys.getPrivate());
-                            peer.start(); // Start PeerThread to communicate with the peer connected
-                            validConnection = true; // Connection established successfully
-                        } else {
-                            System.out.println("=> error: port must be a number between 1 and 65535.");
-                        }
-                    } catch (NumberFormatException e) {
-                        System.out.println("=> error: port must be a valid number.");
-                    } catch (IOException e) {
-                        System.out.println("=> error: connection failed, please try again.");
-                        // No need to close socket here as it's not established yet
-                    }
-                } else {
-                    System.out.println("=> error: incorrect format, please enter 'localhost:port'");
-                }
-            } else {
-                System.out.println("=> error: incorrect format, please enter 'localhost:port'");
-            }
-        }
-    
-        // If a valid connection was established, handle communication
-        if (validConnection) {
-            communicate(bufferedReader, id, serverThread, peer);
-        }
+    public Peer(String address, int port) throws Exception {
+        createUserAtributtes(address, port);
     }
-    
 
-
-    public void communicate(BufferedReader bufferedReader, String id, ServerThread serverThread, PeerThread peer) {
+    public static void createSSLSocket(String address, int port) {
         try {
-            System.out.println("You can now communicate (e to exit, c to change, k to send pubKey)");
-            boolean flag = true;
-            boolean pubKeySent = false;
-            while (flag) {
-                String message = bufferedReader.readLine();
-                System.out.println("Message sended: " + message); // Debug print
-
-                if (message.equals("e")) { // exit the communication
-                    flag = false;
-                    break;
-                } else if (message.equals("c")) { // change the peer
-                    endConnection();
-                    this.socket.close();
-                    updateListenToPeers(bufferedReader, id, serverThread);
-                } else if (message.equals("k")) {
-                    sendPubKey(id, serverThread);
-                    pubKeySent = true;
-                } else {
-                    if (pubKeySent) {
-                        // System.out.println(peer.getReceiverPKey().toString());
-                        byte[] receiverPKey = peer.getReceiverPKey();
-                        StringWriter stringWriter = new StringWriter();
-                        String hash = bytesToString(Create_Digital_Signature(stringToBytes(message), keys.getPrivate()));
-                        message = bytesToString(encryptPubRSA(message, receiverPKey));
-                        // Creates a JSON object with the user's ID and message for transmission.
-                        Json.createWriter(stringWriter).writeObject(Json.createObjectBuilder()
-                                .add("id", id)
-                                .add("message", message)
-                                .add("hash", hash)
-                                .build());
-                        serverThread.sendMessage(stringWriter.toString());
-                    } else {
-                        System.out.println("=> error: you have to send your pubkey before sending any messages");
-                    }
-                }
+            SSLContext context = SSLContext.getInstance("TLSv1.2");
+            KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            KeyStore keys = KeyStore.getInstance("JKS");
+            try (InputStream stream = new FileInputStream("stream.jks")){
+                keys.load(stream, "p2pmessagingapp".toCharArray());
             }
-            System.exit(0);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            keyManager.init(keys, "p2pmessagingapp".toCharArray());
+
+            KeyStore store = KeyStore.getInstance("JKS");
+            try(InputStream storeStream = new FileInputStream("storestream.jks")) {
+                store.load(storeStream, "p2pmessagingapp".toCharArray());
+            }
+
+            TrustManagerFactory trustManager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManager.init(store);
+
+            context.init(keyManager.getKeyManagers(), trustManager.getTrustManagers(), null);
+            SSLSocketFactory factory = context.getSocketFactory();
+            sslSocket = (SSLSocket) factory.createSocket(address, port);
+            
+        } catch (IOException | NoSuchAlgorithmException | KeyStoreException | 
+            UnrecoverableKeyException | CertificateException | KeyManagementException e) {}
     }
 
-    private static void createClientFile(String id, String port, byte[] key) {
+    public static void askForcommunication(BufferedReader bufferedReader, String id, PeerServer serverThread) throws Exception {
+        
+        System.out.println("=> Please enter the ID of the person you want to communicate with below:");
+        String otherPeerID;
+        User receiverUser = null;
+        while(true) {
+            otherPeerID = bufferedReader.readLine();
+            updateActivePeers();
+            receiverUser = findReceiver(otherPeerID);
+            if(receiverUser == null) {
+                System.out.println("=> Invalid ID, please insert a different ID:");
+            }
+            else 
+                break;
+        }
+
+        communicate(bufferedReader, id, serverThread, receiverUser, sslSocket);
+    }
+
+    public static void updateActivePeers() {
+        File portsFile = new File("Ports");
+        try (BufferedReader br = new BufferedReader(new FileReader(portsFile))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                int port = Integer.parseInt(line);
+                
+                File folder = new File("clients");
+                String user = null;
+                if (folder.exists() && folder.isDirectory()) {
+                    File[] files = folder.listFiles(); // Iterate through the files
+                    if (files != null) {
+                        for (File file : files) {
+                            if (file.isFile()) {
+                                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                                    String filePort = reader.readLine();
+                                    if(Integer.parseInt(filePort) == port) {
+                                        user = file.getName();
+                                    }
+                                } catch (IOException e) {}
+                            }
+                        }
+                    }
+                }
+                createUser(user, port); 
+            }
+        } catch (IOException e) {}
+    }
+
+    public static void communicate(BufferedReader bufferedReader, String id, PeerServer serverThread, User receiver, SSLSocket sslSocket) {
+        try {
+            System.out.println("You can now communicate (e to exit, c to change)");
+            OUTER:
+            while (true) {
+                String content = bufferedReader.readLine();
+                switch (content) {
+                    case "e":
+                        // exit the communication
+                        deleteClientFile(values[0]);
+                        deletePortLine();
+                        break OUTER;
+                    case "c":
+                        // change the peer
+                        askForcommunication(bufferedReader, id, serverThread);
+                        break;
+                    default:
+                        Message message = new Message(Users.get(0), receiver, content);
+                        serverThread.sendMessage(message);
+                        break;
+                }
+            }
+            Peer.main(values);
+        } catch (Exception e) {}
+    }
+
+    public void sendMessage(byte[] serializedMessage) {
+        try (OutputStream outputStream = sslSocket.getOutputStream()) {
+            // Enviar a mensagem (os bytes) através do OutputStream
+            System.out.println("Vamos enviar para porta: "+sslSocket.getPort());
+            outputStream.write(serializedMessage);
+            System.out.println("puta");
+            outputStream.flush();
+        } catch (IOException e) {}
+    }
+
+    private static void createClientFile(String id, int port) {
         try {
             File dir = new File("clients");
             if (!dir.exists()) {
@@ -169,46 +186,98 @@ public class Peer {
             }
 
             File file = new File(dir, id);
-            BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-            writer.write(port); // write the port in the file
-            writer.write(System.getProperty("line.separator"));
-            writer.write(DatatypeConverter.printHexBinary(key)); // write the public key in the file
-            writer.close();
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+                writer.write(String.valueOf(port)); // write the port in the file
+            } // write the port in the file
 
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException e) {}
+    }
+
+    private static void deleteClientFile(String userId) {
+        File dir = new File("clients");
+
+        if (dir.exists() && dir.isDirectory()) {
+            File userFile = new File(dir, userId);
+            
+            if (userFile.exists()) {
+                if (userFile.delete()) {
+                    System.out.println("File for user '" + userId + "' deleted successfully.");
+                
+                    if (dir.list().length == 0) {
+                        if (dir.delete()) System.out.println("Directory 'clients' deleted successfully");
+                        else System.out.println("Failed to delete directory 'clients'.");
+                    } else System.out.println("Directory 'clients' is not empty.");
+                } else System.out.println("Failed to delete file for user '" + userId + "'.");
+            } else System.out.println("File for user '" + userId + "' does not exist.");
+        } else System.out.println("Directory 'clients' does not exist.");
+    }
+
+    private static void createPortsFile(int port) {
+        boolean alreadyExists = false;
+        for(User user: Users) {
+            if (user.getPort() == port) alreadyExists = true;
+        }
+        File portFile;
+        if(!alreadyExists) {
+            try {
+                portFile = new File("Ports");
+                portFile.createNewFile();
+                BufferedWriter writer;
+                try (Scanner sc = new Scanner(portFile)) {
+                    writer = new BufferedWriter(new FileWriter(portFile, true)); // append mode
+                    while (sc.hasNextLine()) {
+                        sc.nextLine();
+                    }
+                } // append mode
+                writer.write(String.valueOf(port)); // write the port in the file
+                writer.write(System.getProperty("line.separator"));
+                writer.close();
+    
+            } catch (IOException e) {}
         }
     }
 
-    private static void createUsersFile(String port) {
-        File myObj = null;
-        try {
-            myObj = new File("Ports");
-            if (myObj.createNewFile()) {
-                System.out.println("File created: " + myObj.getName());
+    private static void deletePortsFile() {
+        File portsFile = new File("Ports");
+
+        // Verifica se o arquivo existe
+        if (portsFile.exists()) {
+            if (portsFile.delete()) {
+                System.out.println("File 'Ports' deleted successfully.");
             } else {
-                System.out.println("File already exists.");
+                System.out.println("Failed to delete file 'Ports'.");
             }
-            Scanner sc = new Scanner(myObj);
-            BufferedWriter writer = new BufferedWriter(new FileWriter(myObj, true)); // append mode
-            while (sc.hasNextLine()) {
-                sc.nextLine();
-            }
-            sc.close();
-            writer.write(port); // write the port in the file
-            writer.write(System.getProperty("line.separator"));
-            writer.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        } else {
+            System.out.println("File 'Ports' does not exist.");
         }
     }
 
-    private static KeyPair generateKeys() throws Exception {
-        SecureRandom secureRandom = new SecureRandom();
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(2048, secureRandom);
-        return keyPairGenerator.generateKeyPair();
+    private static void deletePortLine() throws IOException {
+        File portsFile = new File("Ports");
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(portsFile))) {
+            String line;
+            StringBuilder contents = new StringBuilder();
+
+            while ((line = reader.readLine()) != null) {
+                if (line.equals(values[1])) {
+                    continue;
+                }
+                contents.append(line).append(System.lineSeparator());
+            }
+            reader.close();
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(portsFile))) {
+                writer.write(contents.toString());
+                writer.close();
+            }
+        }
+        try (BufferedReader reader = new BufferedReader(new FileReader(portsFile))) {
+            if(reader.readLine() == null) {
+                reader.close();
+                deletePortsFile();
+            }
+        }
     }
 
     private static boolean fileAndPortVerification(String[] values) {
@@ -247,9 +316,8 @@ public class Peer {
                                 if (errorMessage.equals("")) errorMessage = "Port";
                                 else errorMessage = "ID and Port";
                             }
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+                            reader.close();
+                        } catch (IOException e) {}
                     }
                 }
             }
@@ -259,66 +327,54 @@ public class Peer {
         System.out.println("=> " + errorMessage + " already in use, please insert a different " + errorMessage + ":");
         return false;
     }
-    
-    
 
-    private static void sendPubKey(String id, ServerThread serverThread) {
-        StringWriter stringWriter = new StringWriter();
-        byte[] pubKeyToSend = keys.getPublic().getEncoded(); // convert public key to an array of bytes
-        String message = Base64.getEncoder().encodeToString(pubKeyToSend); // Encodes the public key bytes into a (Base64) string         
-        // Creates a JSON object with the user's ID and message for transmission.
-        Json.createWriter(stringWriter).writeObject(Json.createObjectBuilder()
-                .add("id", id)
-                .add("key", message)
-                .build());
-        serverThread.sendMessage(stringWriter.toString());
-    }
-
-    public static byte[] encryptPubRSA(String message, byte[] encodedPbKey) throws Exception {
-        PublicKey publicKey = byteToPublicKey(encodedPbKey);
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-        return cipher.doFinal(message.getBytes());
-    }
-
-    public String bytesToString(byte[] bytes) {
-        return Base64.getMimeEncoder().encodeToString(bytes);
-    }
-
-    public byte[] stringToBytes(String string) {
-        int paddingCount = (4 - string.length() % 4) % 4;
-        if (paddingCount > 0) {
-            string += "=".repeat(paddingCount); // Adiciona o padding necessário
+    private static void createUser(String id, int port) {
+        boolean canCreateUser = true;
+        for (User user : Users) {
+            if (user.getId().equals(id)) { // Verifica se o id do usuário corresponde ao id passado como argumento
+                canCreateUser =  false; // Retorna o usuário encontrado
+            }
         }
-        return Base64.getMimeDecoder().decode(string);
+        if(canCreateUser) {
+            User user = new User(id, port);
+            Users.add(user);
+        }
     }
 
-    public static PublicKey byteToPublicKey(byte[] encodedPbKey) throws Exception {
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encodedPbKey);
-        return keyFactory.generatePublic(publicKeySpec);
+    private static User findReceiver(String id) {
+        for (User user : Users) {
+            try {
+                if (user.getId().equals(id) && !user.getId().equals(Users.get(0).getId())) { // Verifica se o id do usuário corresponde ao id passado como argumento
+                    return user; // Retorna o usuário encontrado
+                }
+            } catch (NullPointerException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
-    private void endConnection() {
-        // Add logic for disconnecting from the peer if needed
+    // Método para adicionar o shutdown hook
+    private static void addShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutdown hook triggered.");
+            try {
+                deleteClientFile(values[0]);
+                deletePortLine(); // Passa a porta atual do cliente
+            } catch (IOException e) {}
+        }));
     }
 
-    public static byte[] encryptPrivRSA(String message, PrivateKey privateKey) throws Exception { 
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-        return cipher.doFinal(message.getBytes());
+    // Método para manter o programa em execução
+    private static void keepProgramRunning() {
+        try {
+            Thread.sleep(Long.MAX_VALUE);
+        }catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Program interrupted.");
+            System.exit(0);
+        }
     }
 
-    private static String makeHash(String text) throws NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hash = digest.digest(text.getBytes(StandardCharsets.UTF_8));
-        String encoded = Base64.getEncoder().encodeToString(hash);
-        return encoded;
-    }
-     public static byte[] Create_Digital_Signature( byte[] input, PrivateKey Key) throws Exception {
-        Signature signature = Signature.getInstance("SHA256withRSA"); 
-        signature.initSign(Key); 
-        signature.update(input); 
-        return signature.sign(); 
-    } 
+
 }

@@ -1,5 +1,6 @@
+com/p2pmessagingapp/User.class
+com/p2pmessagingapp/PeerHandler.class
 com/p2pmessagingapp/App.class
-com/p2pmessagingapp/ServerThread.class
-com/p2pmessagingapp/ServerThreadThread.class
+com/p2pmessagingapp/Message.class
+com/p2pmessagingapp/PeerServer.class
 com/p2pmessagingapp/Peer.class
-com/p2pmessagingapp/PeerThread.class
