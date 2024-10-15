@@ -28,47 +28,51 @@ import javax.net.ssl.TrustManagerFactory;
 
 public class Peer {
     
-    private static SSLSocket sslSocket; // Change from SSLSocket to Socket
+    private SSLSocket sslSocket; // Change from SSLSocket to Socket
     private final static List<User> Users = new ArrayList<>(); // Creates a list of users
-    private static String[] values;
-    private static PeerServer serverThread;
-    private static BufferedReader bufferedReader;
+    private String[] values;
+    private PeerServer serverThread;
+    private BufferedReader bufferedReader;
 
 
     public static void main(String[] args) throws Exception {
-        addShutdownHook(); // Delete client and port files/directories by pressing 'Control + C'
-
+        Peer peer = new Peer();
+        addShutdownHook(peer); // Delete client and port files/directories by pressing 'Control + C'
         System.out.println("=> Please enter your id & port below:(Ex: Valeta 6969) ");
         while (true) {
-            bufferedReader = new BufferedReader(new InputStreamReader(System.in));
-            values = bufferedReader.readLine().split(" "); // Reads and splits user input details
-            boolean verificationStatus = fileAndPortVerification(values);
+            peer.bufferedReader = new BufferedReader(new InputStreamReader(System.in));
+            peer.values = peer.bufferedReader.readLine().split(" "); // Reads and splits user input details
+            boolean verificationStatus = fileAndPortVerification(peer.values);
             if (verificationStatus) {
                 break;
             }
         }
-        serverThread = new PeerServer(Integer.parseInt(values[1]));
-        serverThread.start();
+        peer.serverThread = new PeerServer(Integer.parseInt(peer.values[1]));
+        peer.serverThread.start();
 
-        createUserAtributtes(values[0], Integer.parseInt(values[1]));
+        createUserAtributtes(peer,peer.values[0], Integer.parseInt(peer.values[1]));
 
-        askForcommunication(bufferedReader, values[0], serverThread);
+        askForcommunication(peer,peer.bufferedReader, peer.values[0], peer.serverThread);
         keepProgramRunning();
 
     }
 
-    private static void createUserAtributtes(String address, int port) {
+    private static void createUserAtributtes( Peer peer,String address, int port) {
         createPortsFile(port);
-        createSSLSocket("localhost", port);
+        createSSLSocket(peer,"localhost", port);
         createClientFile(address, port);
         createUser(address, port);
     }
 
     public Peer(String address, int port) throws Exception {
-        createUserAtributtes(address, port);
+        createUserAtributtes(this,address, port);
     }
 
-    public static void createSSLSocket(String address, int port) {
+    public Peer() {
+        //TODO Auto-generated constructor stub
+    }
+
+    public static void createSSLSocket(Peer peer,String address, int port) {
         try {
             SSLContext context = SSLContext.getInstance("TLSv1.2");
             KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -88,13 +92,13 @@ public class Peer {
 
             context.init(keyManager.getKeyManagers(), trustManager.getTrustManagers(), null);
             SSLSocketFactory factory = context.getSocketFactory();
-            sslSocket = (SSLSocket) factory.createSocket(address, port);
+            peer.sslSocket = (SSLSocket) factory.createSocket(address, port);
             
         } catch (IOException | NoSuchAlgorithmException | KeyStoreException | 
             UnrecoverableKeyException | CertificateException | KeyManagementException e) {}
     }
 
-    public static void askForcommunication(BufferedReader bufferedReader, String id, PeerServer serverThread) throws Exception {
+    public static void askForcommunication(Peer peer,BufferedReader bufferedReader, String id, PeerServer serverThread) throws Exception {
         
         System.out.println("=> Please enter the ID of the person you want to communicate with below ('%% exit' to exit):");
         String otherPeerID;
@@ -102,8 +106,8 @@ public class Peer {
         while(true) {
             otherPeerID = bufferedReader.readLine();
             if(otherPeerID.equals("%% exit")){
-                deleteClientFile(values[0]);
-                deletePortLine();
+                deleteClientFile(peer.values[0]);
+                deletePortLine(peer);
                 break;
             }
             updateActivePeers();
@@ -115,7 +119,7 @@ public class Peer {
                 break;
         }
 
-        communicate(bufferedReader, id, serverThread, receiverUser, sslSocket);
+        communicate(peer,bufferedReader, id, serverThread, receiverUser, peer.sslSocket);
     }
 
     public static void updateActivePeers() {
@@ -147,7 +151,7 @@ public class Peer {
         } catch (IOException e) {}
     }
 
-    public static void communicate(BufferedReader bufferedReader, String id, PeerServer serverThread, User receiver, SSLSocket sslSocket) {
+    public static void communicate(Peer peer,BufferedReader bufferedReader, String id, PeerServer serverThread, User receiver, SSLSocket sslSocket) {
         try {
             System.out.println("You can now communicate ('%% exit' to exit, '%% change' to change)");
             OUTER:
@@ -156,12 +160,12 @@ public class Peer {
                 switch (content) {
                     case "%% exit":
                         // exit the communication
-                        deleteClientFile(values[0]);
-                        deletePortLine();
+                        deleteClientFile(peer.values[0]);
+                        deletePortLine(peer);
                         break OUTER;
                     case "%% change":
                         // change the peer
-                        askForcommunication(bufferedReader, id, serverThread);
+                        askForcommunication(peer,bufferedReader, id, serverThread);
                         break;
                     default:
                         Message message = new Message(Users.get(0), receiver, content);
@@ -169,7 +173,7 @@ public class Peer {
                         break;
                 }
             }
-            Peer.main(values);
+            Peer.main(peer.values);
         } catch (Exception e) {}
     }
 
@@ -255,7 +259,7 @@ public class Peer {
         }
     }
 
-    private static void deletePortLine() throws IOException {
+    private static void deletePortLine(Peer peer) throws IOException {
         File portsFile = new File("Ports");
 
         try (BufferedReader reader = new BufferedReader(new FileReader(portsFile))) {
@@ -263,7 +267,7 @@ public class Peer {
             StringBuilder contents = new StringBuilder();
 
             while ((line = reader.readLine()) != null) {
-                if (line.equals(values[1])) {
+                if (line.equals(peer.values[1])) {
                     continue;
                 }
                 contents.append(line).append(System.lineSeparator());
@@ -358,12 +362,12 @@ public class Peer {
     }
 
     // Método para adicionar o shutdown hook
-    private static void addShutdownHook() {
+    private static void addShutdownHook(Peer peer) {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Shutdown hook triggered.");
             try {
-                deleteClientFile(values[0]);
-                deletePortLine(); // Passa a porta atual do cliente
+                deleteClientFile(peer.values[0]);
+                deletePortLine(peer); // Passa a porta atual do cliente
             } catch (IOException e) {}
         }));
     }
