@@ -47,7 +47,7 @@ public class Peer {
                 break;
             }
         }
-        serverThread = new PeerServer(values[0], Integer.parseInt(values[1]));
+        serverThread = new PeerServer(Integer.parseInt(values[1]));
         serverThread.start();
 
         createUserAtributtes(values[0], Integer.parseInt(values[1]));
@@ -96,11 +96,16 @@ public class Peer {
 
     public static void askForcommunication(BufferedReader bufferedReader, String id, PeerServer serverThread) throws Exception {
         
-        System.out.println("=> Please enter the ID of the person you want to communicate with below:");
+        System.out.println("=> Please enter the ID of the person you want to communicate with below ('%% exit' to exit):");
         String otherPeerID;
         User receiverUser = null;
         while(true) {
             otherPeerID = bufferedReader.readLine();
+            if(otherPeerID.equals("%% exit")){
+                deleteClientFile(values[0]);
+                deletePortLine();
+                break;
+            }
             updateActivePeers();
             receiverUser = findReceiver(otherPeerID);
             if(receiverUser == null) {
@@ -144,17 +149,17 @@ public class Peer {
 
     public static void communicate(BufferedReader bufferedReader, String id, PeerServer serverThread, User receiver, SSLSocket sslSocket) {
         try {
-            System.out.println("You can now communicate (e to exit, c to change)");
+            System.out.println("You can now communicate ('%% exit' to exit, '%% change' to change)");
             OUTER:
             while (true) {
                 String content = bufferedReader.readLine();
                 switch (content) {
-                    case "e":
+                    case "%% exit":
                         // exit the communication
                         deleteClientFile(values[0]);
                         deletePortLine();
                         break OUTER;
-                    case "c":
+                    case "%% change":
                         // change the peer
                         askForcommunication(bufferedReader, id, serverThread);
                         break;
@@ -171,9 +176,7 @@ public class Peer {
     public void sendMessage(byte[] serializedMessage) {
         try (OutputStream outputStream = sslSocket.getOutputStream()) {
             // Enviar a mensagem (os bytes) através do OutputStream
-            System.out.println("Vamos enviar para porta: "+sslSocket.getPort());
             outputStream.write(serializedMessage);
-            System.out.println("puta");
             outputStream.flush();
         } catch (IOException e) {}
     }
