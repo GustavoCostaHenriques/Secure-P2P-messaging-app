@@ -31,8 +31,7 @@ import javax.net.ssl.TrustManagerFactory;
 /**
  * The Peer class represents a peer in the P2P messaging application.
  * It handles user interaction, manages the peer server, and facilitates
- * communication
- * between users.
+ * communication between users.
  */
 public class Peer {
 
@@ -129,10 +128,7 @@ public class Peer {
 
             // Check if the user wants to exit the communication
             if (otherPeerID.equals("%% exit")) {
-                deleteClientFile(peer.values[0]); // Clean up client file
-                deletePortLine(peer); // Clean up port line
-                peer.serverThread.closeServerSocket();
-                Users.clear(); // This will empty the list of users
+                killClient(peer);
                 Peer.main(peer.values);
             }
 
@@ -181,14 +177,17 @@ public class Peer {
                 switch (content) {
                     case "%% exit":
                         // Exit the communication
-                        deleteClientFile(peer.values[0]); // Clean up client file
-                        deletePortLine(peer); // Clean up port line
-                        peer.serverThread.closeServerSocket();
-                        Users.clear(); // This will empty the list of users
+                        killClient(peer);
                         break OUTER; // Break out of the loop
                     case "%% change":
                         // Change the peer for communication
                         askForcommunication(peer, bufferedReader, id, serverThread); // Prompt for a new peer
+                        /**
+                         * TODO: Discuss if we should clear all the users. If we don't, when the user
+                         * communicates again the system will accept a user that was online and is now
+                         * offline and then, the message saying that the user is offline will apear.
+                         */
+
                         break;
                     default:
                         // Create a message and send it to the receiver
@@ -346,6 +345,10 @@ public class Peer {
         }
     }
 
+    // -----------------------------------------------------------------------------------------------------------------------------//
+    // ----------------------------------------------CHAT-DIRECTORY-MANAGEMENT-METHODS----------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
     /**
      * Utility method to create the "chats" directory if it doesn't already exist.
      * This directory is used to store chat history files.
@@ -361,15 +364,11 @@ public class Peer {
         }
     }
 
-    // -----------------------------------------------------------------------------------------------------------------------------//
-    // ----------------------------------------------CHAT-DIRECTORY-MANAGEMENT-METHODS----------------------------------------------//
-    // -----------------------------------------------------------------------------------------------------------------------------//
-
     /**
      * Creates a new chat file between two users, if it doesn't already exist.
      * Checks both possible name combinations for the chat file (user1-user2 and
-     * user2-user1),
-     * ensuring that only one file is created for a conversation between two users.
+     * user2-user1), ensuring that only one file is created for a conversation
+     * between two users.
      *
      * @param user1 The first user's ID.
      * @param user2 The second user's ID.
@@ -404,8 +403,22 @@ public class Peer {
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
-    // ---------------------------------------------------CLIENT-AND-PORT-REMOVAL---------------------------------------------------//
+    // ----------------------------------------------------KILLING-CLIENT-PROCESS---------------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
+
+    /**
+     * Functions that deals with the all process of killing the client
+     * 
+     * @param peer The peer instance to get the global values.
+     * @throws IOException If an I/O error occurs during the killing operations.
+     */
+    private static void killClient(Peer peer) throws IOException {
+        deleteClientFile(peer.values[0]); // Clean up client file
+        deletePortLine(peer); // Clean up port line
+        peer.serverThread.closeServerSocket(); // Closes server socket
+        Users.clear(); // This will empty the list of users
+        deleteMessageFile(peer);
+    }
 
     /**
      * Deletes the client file associated with the given user ID.
@@ -489,6 +502,15 @@ public class Peer {
                 deletePortsFile();
             }
         }
+    }
+
+    /**
+     * Deletes all the necessary message files.
+     * 
+     * @param peer The peer instance to get the global values.
+     */
+    private static void deleteMessageFile(Peer peer) {
+        // TODO: Remove all message files of the this user if the other is offline.
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//

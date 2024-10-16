@@ -170,8 +170,13 @@ public final class PeerServer extends Thread {
         return false;
     }
 
+    /**
+     * Closes the server socket.
+     * 
+     * @throws IOException If an error occurs during the closing process.
+     */
     public void closeServerSocket() throws IOException {
-        if (serverSocket != null) {
+        if (serverSocket != null) { // Checks if server is null
             serverSocket.close();
         }
     }
