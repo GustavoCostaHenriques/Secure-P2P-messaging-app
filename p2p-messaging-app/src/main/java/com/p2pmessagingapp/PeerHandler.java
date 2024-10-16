@@ -1,8 +1,11 @@
 package com.p2pmessagingapp;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.util.Scanner;
 
 import javax.net.ssl.SSLSocket;
 
@@ -49,13 +52,29 @@ public class PeerHandler extends Thread {
             while (true) {
                 // Block until an object is available to be read
                 Message message = (Message) objectInputStream.readObject();
-
+                writeOnChat(message.getTime()+"-"+"[" + message.getSender().getId() + "] " + message.getContent(), message.getFileName());
                 System.out.println("[" + message.getSender().getId() + "] " + message.getContent());
                 break; // Exit after reading the first message (consider removing this break for
                        // continuous listening)
             }
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace(); // Log the error to see what went wrong
+        }
+    }
+    private void writeOnChat(String message, String fileName){
+        try {
+            BufferedWriter fileWriter;
+            try (Scanner sc = new Scanner(fileName)) {
+                    fileWriter = new BufferedWriter(new FileWriter(fileName, true)); // append mode
+                    while (sc.hasNextLine()) {
+                        sc.nextLine();
+                    }
+                } // appen
+            fileWriter.write(message);
+            fileWriter.write(System.getProperty("line.separator"));
+            fileWriter.close();
+        } catch (IOException e) {
+            System.out.println("ERROR-NO SUCH FILE EXISTS");
         }
     }
 }

@@ -166,6 +166,8 @@ public class Peer {
     private static void communicate(Peer peer, BufferedReader bufferedReader, String id, PeerServer serverThread,
             User receiver,
             SSLSocket sslSocket) {
+        createChatDir();
+        String filename = createChat(id, receiver.getId());
         try {
             // Inform the user that communication can now begin
             System.out.println("=>You can now communicate ('%% exit' to exit, '%% change' to change)");
@@ -185,7 +187,7 @@ public class Peer {
                         break;
                     default:
                         // Create a message and send it to the receiver
-                        Message message = new Message(Users.get(0), receiver, content);
+                        Message message = new Message(Users.get(0), receiver, content, filename);
                         serverThread.sendMessage(message); // Send the message through the server thread
                         break;
                 }
@@ -257,6 +259,36 @@ public class Peer {
             } catch (IOException e) {
             }
         }
+    }
+
+    private static void createChatDir(){
+        try {
+            File dir = new File("chats");
+            if (!dir.exists()) {
+                dir.mkdir();
+            }
+        } catch (Exception e) {}
+    }
+
+    private static String createChat(String user1, String user2){
+        try {
+            String name = "chats/"+user1+"-"+user2;
+            String othername = "chats/"+user2+"-"+user1;
+            File chat = new File(name);
+            File otherChat = new File(othername);
+            if (!chat.exists() && !otherChat.exists()) {
+                chat.createNewFile();
+            }
+            if (chat.exists()) {
+                return name;
+            }
+            else if (otherChat.exists()) {
+                return othername;
+            }
+        } catch (Exception e) {
+
+        }
+        return null;
     }
 
     /**
