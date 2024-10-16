@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.net.SocketException;
 import java.io.File;
 
 import java.security.KeyManagementException;
@@ -111,13 +112,18 @@ public final class PeerServer extends Thread {
     @Override
     public void run() {
         try {
-            while (true) { // Infinite loop to keep the server running and accepting client connections.
-                SSLSocket sslSocket = (SSLSocket) serverSocket.accept(); // Accept the connection and return a Socket
+            while (!serverSocket.isClosed()) { // Infinite loop to keep the server running and accepting client
+                                               // connections.
+                SSLSocket sslSocket = (SSLSocket) serverSocket.accept(); // Accept the connection and return a
+                                                                         // Socket
                 peerHandler = new PeerHandler(sslSocket); // Create a new PeerHandler for the connection
                 peerHandler.start(); // Start the PeerHandler thread
             }
+        } catch (SocketException e) {
+            if (!serverSocket.isClosed())
+                e.printStackTrace(); // Log the error if it's not due to the socket being closed
         } catch (IOException e) {
-            e.printStackTrace(); // Log any IOExceptions that occur
+            e.printStackTrace(); // Log any other IOExceptions that occur
         }
     }
 
@@ -132,7 +138,7 @@ public final class PeerServer extends Thread {
         boolean isAlive = checkIfPeerIsAlive(message.getReceiver().getId()); // Checks if the receptor is alive
         if (!isAlive) {
             System.out.println("=> " + message.getReceiver().getId()
-                    + " is not online right now. Please try again later or write '%% change' to talk with another person.");
+                    + " is not online right now. Please try again later or write '%% change' to talk with another person or '%% exit' to exit.");
         } else {
             peer = new Peer(message.getReceiver().getId(), message.getReceiver().getPort()); // Create a Peer instance
                                                                                              // for
@@ -162,5 +168,11 @@ public final class PeerServer extends Thread {
             }
         }
         return false;
+    }
+
+    public void closeServerSocket() throws IOException {
+        if (serverSocket != null) {
+            serverSocket.close();
+        }
     }
 }

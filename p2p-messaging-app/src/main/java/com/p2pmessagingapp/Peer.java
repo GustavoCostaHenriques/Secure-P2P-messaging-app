@@ -131,6 +131,8 @@ public class Peer {
             if (otherPeerID.equals("%% exit")) {
                 deleteClientFile(peer.values[0]); // Clean up client file
                 deletePortLine(peer); // Clean up port line
+                peer.serverThread.closeServerSocket();
+                Users.clear(); // This will empty the list of users
                 Peer.main(peer.values);
             }
 
@@ -166,6 +168,7 @@ public class Peer {
     private static void communicate(Peer peer, BufferedReader bufferedReader, String id, PeerServer serverThread,
             User receiver,
             SSLSocket sslSocket) {
+
         createChatDir();
         String filename = createChat(id, receiver.getId());
         try {
@@ -180,6 +183,8 @@ public class Peer {
                         // Exit the communication
                         deleteClientFile(peer.values[0]); // Clean up client file
                         deletePortLine(peer); // Clean up port line
+                        peer.serverThread.closeServerSocket();
+                        Users.clear(); // This will empty the list of users
                         break OUTER; // Break out of the loop
                     case "%% change":
                         // Change the peer for communication
@@ -261,36 +266,6 @@ public class Peer {
         }
     }
 
-    private static void createChatDir(){
-        try {
-            File dir = new File("chats");
-            if (!dir.exists()) {
-                dir.mkdir();
-            }
-        } catch (Exception e) {}
-    }
-
-    private static String createChat(String user1, String user2){
-        try {
-            String name = "chats/"+user1+"-"+user2;
-            String othername = "chats/"+user2+"-"+user1;
-            File chat = new File(name);
-            File otherChat = new File(othername);
-            if (!chat.exists() && !otherChat.exists()) {
-                chat.createNewFile();
-            }
-            if (chat.exists()) {
-                return name;
-            }
-            else if (otherChat.exists()) {
-                return othername;
-            }
-        } catch (Exception e) {
-
-        }
-        return null;
-    }
-
     /**
      * Creates an SSL socket for secure communication with the specified address and
      * port.
@@ -369,6 +344,63 @@ public class Peer {
             User user = new User(id, port);
             Users.add(user); // Add the new user to the list
         }
+    }
+
+    /**
+     * Utility method to create the "chats" directory if it doesn't already exist.
+     * This directory is used to store chat history files.
+     */
+    private static void createChatDir() {
+        try {
+            File dir = new File("chats"); // Create a reference to the "chats" directory
+            if (!dir.exists()) { // Check if the directory doesn't exist
+                dir.mkdir(); // Create the directory
+            }
+        } catch (Exception e) {
+            // Handle exception silently (could log error if necessary)
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------------------//
+    // ----------------------------------------------CHAT-DIRECTORY-MANAGEMENT-METHODS----------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
+    /**
+     * Creates a new chat file between two users, if it doesn't already exist.
+     * Checks both possible name combinations for the chat file (user1-user2 and
+     * user2-user1),
+     * ensuring that only one file is created for a conversation between two users.
+     *
+     * @param user1 The first user's ID.
+     * @param user2 The second user's ID.
+     * @return The name of the chat file that exists or was created, or null if an
+     *         error occurred.
+     */
+    private static String createChat(String user1, String user2) {
+        try {
+            // File path in the format "chats/user1-user2"
+            String name = "chats/" + user1 + "-" + user2;
+            // Alternative file path in the format "chats/user2-user1"
+            String othername = "chats/" + user2 + "-" + user1;
+
+            File chat = new File(name); // Create a reference to the first possible chat file
+            File otherChat = new File(othername); // Create a reference to the second possible chat file
+
+            // If neither chat file exists, create the first one
+            if (!chat.exists() && !otherChat.exists()) {
+                chat.createNewFile(); // Create the chat file with name user1-user2
+            }
+
+            // Return the name of the file that exists
+            if (chat.exists()) {
+                return name; // Return user1-user2 if it exists
+            } else if (otherChat.exists()) {
+                return othername; // Return user2-user1 if it exists
+            }
+        } catch (Exception e) {
+            // Handle exception silently (could log error if necessary)
+        }
+        return null; // Return null if no chat file could be created or found
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//

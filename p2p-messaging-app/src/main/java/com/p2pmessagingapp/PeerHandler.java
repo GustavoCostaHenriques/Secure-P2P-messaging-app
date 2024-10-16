@@ -52,7 +52,8 @@ public class PeerHandler extends Thread {
             while (true) {
                 // Block until an object is available to be read
                 Message message = (Message) objectInputStream.readObject();
-                writeOnChat(message.getTime()+"-"+"[" + message.getSender().getId() + "] " + message.getContent(), message.getFileName());
+                writeOnChat(message.getTime() + "-" + "[" + message.getSender().getId() + "] " + message.getContent(),
+                        message.getFileName());
                 System.out.println("[" + message.getSender().getId() + "] " + message.getContent());
                 break; // Exit after reading the first message (consider removing this break for
                        // continuous listening)
@@ -61,20 +62,37 @@ public class PeerHandler extends Thread {
             e.printStackTrace(); // Log the error to see what went wrong
         }
     }
-    private void writeOnChat(String message, String fileName){
+
+    /**
+     * Writes a message to a specified chat file.
+     *
+     * @param message  The message to be written to the chat.
+     * @param fileName The name of the chat file where the message will be appended.
+     */
+    private void writeOnChat(String message, String fileName) {
         try {
             BufferedWriter fileWriter;
+
+            // Using a Scanner to read through the file for any existing content (not
+            // necessary for writing)
             try (Scanner sc = new Scanner(fileName)) {
-                    fileWriter = new BufferedWriter(new FileWriter(fileName, true)); // append mode
-                    while (sc.hasNextLine()) {
-                        sc.nextLine();
-                    }
-                } // append mode
+                // Initialize BufferedWriter in append mode
+                fileWriter = new BufferedWriter(new FileWriter(fileName, true)); // append mode
+
+                // Read through existing lines (this part is redundant for writing)
+                while (sc.hasNextLine()) {
+                    sc.nextLine();
+                }
+            }
+
+            // Write the new message to the file followed by a newline
             fileWriter.write(message);
             fileWriter.write(System.getProperty("line.separator"));
-            fileWriter.close();
+            fileWriter.close(); // Close the writer to release system resources
         } catch (IOException e) {
+            // Log an error message if the file does not exist or another I/O error occurs
             System.out.println("ERROR-NO SUCH FILE EXISTS");
         }
     }
+
 }

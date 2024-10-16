@@ -1,8 +1,6 @@
 package com.p2pmessagingapp;
 
 import java.io.Serializable;
-import java.sql.Time;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -18,8 +16,8 @@ public class Message implements Serializable {
     private final User sender; // The user who is sending the message
     private final User receiver; // The user who is receiving the message
     private final String content; // The content of the message
-    private final String fileName;
-    private final String time;
+    private final String fileName; // The name of the file that is going to store the message information
+    private final String time; // The time when the message was sent
 
     /**
      * Constructs a Message instance with a sender, receiver, and content.
@@ -63,14 +61,22 @@ public class Message implements Serializable {
     public String getContent() {
         return content;
     }
+
     /**
      * Gets filename
+     * 
      * @return filename
      */
-    public String getFileName(){
+    public String getFileName() {
         return fileName;
     }
-    public String getTime(){
+
+    /**
+     * Gets time
+     * 
+     * @return time
+     */
+    public String getTime() {
         return time;
     }
 }
