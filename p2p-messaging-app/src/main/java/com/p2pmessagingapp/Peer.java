@@ -181,13 +181,8 @@ public class Peer {
                         break OUTER; // Break out of the loop
                     case "%% change":
                         // Change the peer for communication
+                        Users.clear();
                         askForcommunication(peer, bufferedReader, id, serverThread); // Prompt for a new peer
-                        /**
-                         * TODO: Discuss if we should clear all the users. If we don't, when the user
-                         * communicates again the system will accept a user that was online and is now
-                         * offline and then, the message saying that the user is offline will apear.
-                         */
-
                         break;
                     default:
                         // Create a message and send it to the receiver
@@ -505,12 +500,84 @@ public class Peer {
     }
 
     /**
-     * Deletes all the necessary message files.
+     * Deletes all the necessary message files. It checks if the corresponding peer
+     * (user) is offline and, if so, deletes the message files related to that peer.
+     * After processing all files, if the "chats" directory is empty, it deletes the
+     * directory.
      * 
-     * @param peer The peer instance to get the global values.
+     * @param peer The peer instance used to get the global values (e.g., the
+     *             current user's name).
      */
     private static void deleteMessageFile(Peer peer) {
-        // TODO: Remove all message files of the this user if the other is offline.
+        // Define the "chats" folder where message files are stored
+        File chatsFolder = new File("chats");
+
+        // Array to hold the list of files in the "chats" directory
+        File[] chatsFiles;
+
+        // Check if the "chats" directory exists and is a directory
+        if (chatsFolder.exists() && chatsFolder.isDirectory()) {
+            // Get the list of files inside the "chats" directory
+            chatsFiles = chatsFolder.listFiles();
+
+            // If the directory contains files (non-null), process them
+            if (chatsFiles != null) {
+                // Loop through each file in the "chats" directory
+                for (File chatsFile : chatsFiles) {
+                    // Ensure that the current item is a file and not a subdirectory
+                    if (chatsFile.isFile()) {
+                        // Extract the names of the users involved in the chat from the filename
+                        String[] usersNames = chatsFile.getName().split("-");
+                        String otherUser = null;
+
+                        // Determine which user is the other participant in the chat
+                        if (peer.values[0].equals(usersNames[0])) {
+                            otherUser = usersNames[1]; // If the current peer is the first user, set the other user
+                        } else if (peer.values[0].equals(usersNames[1])) {
+                            otherUser = usersNames[0]; // If the current peer is the second user, set the other user
+                        }
+
+                        // Flag to check if the other user (client) is online
+                        Boolean clientIsOnline = false;
+
+                        // Define the "clients" folder where online clients are registered
+                        File clientsFolder = new File("clients");
+
+                        // Check if the "clients" directory exists and is a directory
+                        if (clientsFolder.exists() && clientsFolder.isDirectory()) {
+                            // Get the list of files inside the "clients" directory
+                            File[] clientsFiles = clientsFolder.listFiles();
+
+                            // If the directory contains files (non-null), process them
+                            if (clientsFiles != null) {
+                                // Loop through each file in the "clients" directory
+                                for (File clientFile : clientsFiles) {
+                                    // Ensure that the current item is a file and not a subdirectory
+                                    if (clientFile.isFile()) {
+                                        // Check if the filename matches the other user's name
+                                        if (clientFile.getName().equals(otherUser)) {
+                                            clientIsOnline = true; // Set the flag if the other user is online
+                                        }
+                                        break; // Exit the loop once the client is found
+                                    }
+                                }
+                            }
+                        }
+
+                        // If the other user (client) is not online, delete the message file
+                        if (!clientIsOnline) {
+                            chatsFile.delete(); // Delete the chat file for the offline user
+                        }
+                    }
+                }
+            }
+        }
+
+        // After processing all files, check if the "chats" directory is now empty
+        chatsFiles = chatsFolder.listFiles(); // Refresh the file list after deletions
+        if (chatsFiles != null && chatsFiles.length == 0) {
+            chatsFolder.delete(); // Delete the "chats" directory if no files remain
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
