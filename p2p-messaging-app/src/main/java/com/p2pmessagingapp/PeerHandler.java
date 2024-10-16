@@ -69,7 +69,7 @@ public class PeerHandler extends Thread {
                     while (sc.hasNextLine()) {
                         sc.nextLine();
                     }
-                } // appen
+                } // append
             fileWriter.write(message);
             fileWriter.write(System.getProperty("line.separator"));
             fileWriter.close();
