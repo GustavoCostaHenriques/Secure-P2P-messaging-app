@@ -691,6 +691,7 @@ public class Peer {
         File filename = new File("clients/" + peer.values[0]); // Check if the ID already exists
         if (filename.exists()) {
             setRepeatedId(peer, true);
+            returnValue = false;
         }
 
         // Check if the second value (port) is a valid number

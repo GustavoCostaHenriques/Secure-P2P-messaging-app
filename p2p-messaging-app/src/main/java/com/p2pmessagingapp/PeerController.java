@@ -8,10 +8,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import java.util.HashMap;
+import java.util.Map;
 
 @Controller
 public class PeerController {
-    private Peer peer;
+
+    private Map<String, Peer> peerMap = new HashMap<>();
 
     // Endpoint for welcome page
     @GetMapping("/")
@@ -25,7 +28,7 @@ public class PeerController {
         return "login";
     }
 
-    // Endpoint to capture data submited
+    // Endpoint to capture data submitted
     @PostMapping("/login")
     public String submitForm(
             @RequestParam("id") String id,
@@ -38,7 +41,7 @@ public class PeerController {
         client_values[1] = port;
         client_values[2] = ip;
 
-        peer = new Peer();
+        Peer peer = new Peer();
         try {
             peer.startPeer(client_values);
         } catch (Exception e) {
@@ -46,7 +49,6 @@ public class PeerController {
         }
 
         if (!peer.getVerificationStatus()) {
-
             if (peer.getRepeatedId())
                 model.addAttribute("errorIdMessage", "User already exists.");
 
@@ -57,12 +59,22 @@ public class PeerController {
             return "login";
         }
 
-        return "redirect:/menu";
+        String peerId = id;
+
+        // Store peer in peerMap with unique peerId
+        peerMap.put(peerId, peer);
+
+        return "redirect:/menu?peerId=" + peerId;
     }
 
     // Endpoint for menu page
     @GetMapping("/menu")
-    public String menu(Model model) {
+    public String menu(@RequestParam("peerId") String peerId, Model model) {
+        Peer peer = peerMap.get(peerId);
+        if (peer == null) {
+            return "error"; // Handle case where peer is not found
+        }
+
         String userId = peer.getValues()[0];
         String userPort = peer.getValues()[1];
         String userIp = peer.getValues()[2];
@@ -77,10 +89,12 @@ public class PeerController {
     // Endpoint to handle logout and kill the peer client
     @PostMapping("/logout")
     @ResponseBody
-    public String logout() {
+    public String logout(@RequestParam("peerId") String peerId) {
+        Peer peer = peerMap.get(peerId);
         if (peer != null) {
             try {
                 peer.killClient(peer);
+                peerMap.remove(peerId); // Remove peer from map when logged out
                 return "success";
             } catch (IOException e) {
                 return "error";
