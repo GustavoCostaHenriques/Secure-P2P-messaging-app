@@ -80,7 +80,7 @@ public class PeerController {
     public String logout() {
         if (peer != null) {
             try {
-                peer.killClient();
+                peer.killClient(peer);
                 return "success";
             } catch (IOException e) {
                 return "error";

@@ -133,7 +133,7 @@ public class Peer {
 
             // Check if the user wants to exit the communication
             if (otherPeerID.equals("%% exit")) {
-                peer.killClient();
+                peer.killClient(peer);
                 peer.startPeer(peer.values);
             }
 
@@ -182,7 +182,7 @@ public class Peer {
                 switch (content) {
                     case "%% exit":
                         // Exit the communication
-                        peer.killClient();
+                        peer.killClient(peer);
                         break OUTER; // Break out of the loop
                     case "%% change":
                         // Change the peer for communication
@@ -415,14 +415,15 @@ public class Peer {
     /**
      * Functions that deals with the all process of killing the client
      * 
+     * @param peer The peer instance to get the global values.
      * @throws IOException If an I/O error occurs during the killing operations.
      */
-    public void killClient() throws IOException {
-        deleteClientFile(this.values[0]); // Clean up client file
-        deletePortLine(this); // Clean up port line
-        this.serverThread.closeServerSocket(); // Closes server socket
-        Users.clear(); // This will empty the list of users
-        deleteMessageFile(this);
+    public void killClient(Peer peer) throws IOException {
+        deleteClientFile(peer.values[0]); // Clean up client file
+        deletePortLine(peer); // Clean up port line
+        peer.serverThread.closeServerSocket(); // Closes server socket
+        Users.clear(); // peer will empty the list of users
+        deleteMessageFile(peer);
     }
 
     /**
