@@ -200,8 +200,12 @@
         }
 
         function logout() {
-            // Send a POST request to the logout endpoint
-            fetch('/logout', {
+            // Get the peerId from the current URL
+            var urlParams = new URLSearchParams(window.location.search);
+            var peerId = urlParams.get('peerId');
+
+            // Send a POST request to the logout endpoint with the peerId
+            fetch('/logout?peerId=' + peerId, {
                 method: 'POST',
             })
             .then(response => response.text())
