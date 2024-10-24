@@ -1,3 +1,4 @@
 1º - mvn clean install
 2º - mvn compile
-3º - mvn exec:java -Dexec.mainClass="com.p2pmessagingapp.Peer"
+3º - mvn spring-boot:run
+4º - Open in the browser the URL "localhost:8080"
