@@ -140,9 +140,8 @@ public final class PeerServer extends Thread {
             System.out.println("=> " + message.getReceiver().getId()
                     + " is not online right now. Please try again later or write '%% change' to talk with another person or '%% exit' to exit.");
         } else {
-            peer = new Peer(message.getReceiver().getId(), message.getReceiver().getPort()); // Create a Peer instance
-                                                                                             // for
-            // the receiver
+            peer = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
+                    message.getReceiver().getPort()); // Create a Peer instance for the receiver
             byte[] serializedMessage = serializeMessage(message); // Serialize the message
             peer.sendMessage(serializedMessage); // Send the serialized message to the peer
         }

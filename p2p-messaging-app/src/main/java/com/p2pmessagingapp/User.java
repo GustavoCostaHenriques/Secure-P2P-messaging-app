@@ -12,6 +12,7 @@ public class User implements Serializable {
     private static final long serialVersionUID = 1L; // Serialization ID for versioning
 
     private final String id; // Unique identifier for the user
+    private final String ip; // Unique internet protocol for the user
     private final int port; // Port number associated with the user
 
     /**
@@ -20,8 +21,9 @@ public class User implements Serializable {
      * @param id   The unique ID of the user.
      * @param port The port number the user is connected to.
      */
-    public User(String id, int port) {
+    public User(String id, String ip, int port) {
         this.id = id; // Set the user's ID
+        this.ip = ip; // Set the usr's IP
         this.port = port; // Set the user's port
     }
 
@@ -32,6 +34,15 @@ public class User implements Serializable {
      */
     public String getId() {
         return id;
+    }
+
+    /**
+     * Gets the IP of the user.
+     *
+     * @return The IP of the user.
+     */
+    public String getIp() {
+        return ip;
     }
 
     /**

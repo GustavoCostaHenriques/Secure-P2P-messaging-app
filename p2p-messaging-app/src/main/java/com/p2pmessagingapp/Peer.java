@@ -8,7 +8,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 
 import java.security.KeyManagementException;
@@ -36,58 +35,64 @@ import javax.net.ssl.TrustManagerFactory;
 public class Peer {
 
     private SSLSocket sslSocket; // SSL socket for secure communication
-    private String[] values; // Array to hold user input values (ID and port)
+    private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
     private PeerServer serverThread; // Thread for the peer server
-    private BufferedReader bufferedReader; // Buffered reader for user input
     private final static List<User> Users = new ArrayList<>(); // Creates a list of users
+    private boolean verificationStatus; // Boolean that checks the values of this peer
+    private boolean repeatedId; // Boolean that checks the values of this peer
+    private boolean repeatedPort; // Boolean that checks the values of this peer
 
     /**
-     * The main method serves as the entry point for the P2P messaging application.
+     * The startPeer method serves as the entry point for the P2P messaging
+     * application.
      * It prompts the user for their ID and port, verifies the input, starts the
      * peer server, and facilitates communication with other peers.
      *
-     * @param args Command line arguments (not used in this application).
+     * @param args Arguments received from the submissionForm in the PeerController.
      * @throws Exception If an error occurs during initialization or communication.
      */
-    public static void main(String[] args) throws Exception {
-        Peer peer = new Peer();
+    public void startPeer(String[] args) throws Exception {
         // Add a shutdown hook to delete client and port files/directories upon exiting
-        addShutdownHook(peer); // Triggered by pressing 'Control + C'
+        addShutdownHook(this); // Triggered by pressing 'Control + C'
 
-        System.out.println("=> Please enter your id & port below:");
-        // Continuously prompt the user for ID and port until valid input is received
-        while (true) {
-            peer.bufferedReader = new BufferedReader(new InputStreamReader(System.in));
-            // Read and split user input details into the values array
-            peer.values = peer.bufferedReader.readLine().split(" ");
-            boolean verificationStatus = fileAndPortVerification(peer); // Verify input values
-            if (verificationStatus) {
-                break; // Exit the loop if verification is successful
-            }
+        for (int i = 0; i < 3; i++) {
+            this.values[i] = args[i];
         }
 
-        // Start the peer server on the specified port
-        peer.serverThread = new PeerServer(Integer.parseInt(peer.values[1]));
-        peer.serverThread.start();
+        setRepeatedId(this, false); // In each cycle we assume that the ID is going to be valid
+        setRepeatedId(this, false); // In each cycle we assume that the Port is going to be valid
 
-        // Create user attributes (e.g., user file and socket) based on user input
-        createUserAtributtes(peer, peer.values[0], Integer.parseInt(peer.values[1]));
+        this.verificationStatus = fileAndPortVerification(this); // Verify input values
 
-        // Prompt the user for a peer to communicate with
-        askForcommunication(peer, peer.bufferedReader, peer.values[0], peer.serverThread);
-        // Keep the program running indefinitely
-        keepProgramRunning();
+        setVerificationStatus(this, this.verificationStatus);
+        if (this.verificationStatus) {
+            // Start the peer server on the specified port
+            this.serverThread = new PeerServer(Integer.parseInt(this.values[1]));
+            this.serverThread.start();
+
+            // Create user attributes based on user input
+            createUserAtributtes(this, this.values[0], this.values[2], Integer.parseInt(this.values[1]));
+
+            // Prompt the user for a peer to communicate with
+            // askForcommunication(this, this.bufferedReader, this.values[0],
+            // this.serverThread);
+            // Keep the program running indefinitely
+            keepProgramRunning();
+        }
     }
 
     /**
      * Constructs a Peer instance and initializes user attributes.
      *
-     * @param address The ID of the user.
-     * @param port    The port number to be used for communication.
+     * @param id   The ID of the user.
+     * @param port The port number to be used for communication.
      * @throws Exception If an error occurs during initialization.
      */
-    public Peer(String address, int port) throws Exception {
-        createUserAtributtes(this, address, port); // Create user attributes for a new peer
+    public Peer(String id, String ip, int port) throws Exception {
+        this.values[0] = id;
+        this.values[1] = String.valueOf(port);
+        this.values[2] = ip;
+        createUserAtributtes(this, id, ip, port); // Create user attributes for a new peer
     }
 
     /**
@@ -128,8 +133,8 @@ public class Peer {
 
             // Check if the user wants to exit the communication
             if (otherPeerID.equals("%% exit")) {
-                killClient(peer);
-                Peer.main(peer.values);
+                peer.killClient();
+                peer.startPeer(peer.values);
             }
 
             // Update the list of active peers
@@ -177,7 +182,7 @@ public class Peer {
                 switch (content) {
                     case "%% exit":
                         // Exit the communication
-                        killClient(peer);
+                        peer.killClient();
                         break OUTER; // Break out of the loop
                     case "%% change":
                         // Change the peer for communication
@@ -191,7 +196,7 @@ public class Peer {
                         break;
                 }
             }
-            Peer.main(peer.values); // Return to the main peer interface
+            peer.startPeer(peer.values); // Return to the start peer interface
         } catch (Exception e) {
         }
     }
@@ -217,15 +222,16 @@ public class Peer {
     /**
      * Creates user attributes by initializing necessary files and SSL socket.
      *
-     * @param peer    The peer instance to get the global values.
-     * @param address The address of the user.
-     * @param port    The port number associated with the user.
+     * @param peer The peer instance to get the global values.
+     * @param id   The id of the user.
+     * @param ip   The ip address of the user.
+     * @param port The port number associated with the user.
      */
-    private static void createUserAtributtes(Peer peer, String address, int port) {
+    private static void createUserAtributtes(Peer peer, String id, String ip, int port) {
         createPortsFile(port);
-        createSSLSocket(peer, "localhost", port);
-        createClientFile(address, port);
-        createUser(address, port);
+        createSSLSocket(peer, ip, port);
+        createClientFile(id, ip, port);
+        createUser(id, ip, port);
     }
 
     /**
@@ -261,14 +267,15 @@ public class Peer {
     }
 
     /**
-     * Creates an SSL socket for secure communication with the specified address and
+     * Creates an SSL socket for secure communication with the specified ip address
+     * and
      * port.
      *
-     * @param peer    The peer instance to get the global values.
-     * @param address The address to connect to.
-     * @param port    The port number to connect to.
+     * @param peer The peer instance to get the global values.
+     * @param ip   The ip address to connect to.
+     * @param port The port number to connect to.
      */
-    private static void createSSLSocket(Peer peer, String address, int port) {
+    private static void createSSLSocket(Peer peer, String ip, int port) {
         try {
             SSLContext context = SSLContext.getInstance("TLSv1.2");
             KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -289,7 +296,7 @@ public class Peer {
 
             context.init(keyManager.getKeyManagers(), trustManager.getTrustManagers(), null);
             SSLSocketFactory factory = context.getSocketFactory();
-            peer.sslSocket = (SSLSocket) factory.createSocket(address, port);
+            peer.sslSocket = (SSLSocket) factory.createSocket(ip, port);
 
         } catch (IOException | NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException
                 | CertificateException | KeyManagementException e) {
@@ -301,9 +308,10 @@ public class Peer {
      * number to it.
      *
      * @param id   The identifier of the user.
+     * @param ip   The ip address of the user.
      * @param port The port number to be written in the client file.
      */
-    private static void createClientFile(String id, int port) {
+    private static void createClientFile(String id, String ip, int port) {
         try {
             File dir = new File("clients");
             if (!dir.exists()) {
@@ -313,6 +321,8 @@ public class Peer {
             File file = new File(dir, id);
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
                 writer.write(String.valueOf(port)); // write the port in the file
+                writer.write(System.getProperty("line.separator"));
+                writer.write(ip);
             } // write the port in the file
 
         } catch (IOException e) {
@@ -325,9 +335,10 @@ public class Peer {
      * already exist.
      *
      * @param id   The identifier of the user.
+     * @param ip   The ip address of the user.
      * @param port The port number associated with the user.
      */
-    private static void createUser(String id, int port) {
+    private static void createUser(String id, String ip, int port) {
         boolean canCreateUser = true;
         for (User user : Users) {
             if (user.getId().equals(id)) { // Check if the user ID matches the given ID
@@ -335,7 +346,7 @@ public class Peer {
             }
         }
         if (canCreateUser) {
-            User user = new User(id, port);
+            User user = new User(id, ip, port);
             Users.add(user); // Add the new user to the list
         }
     }
@@ -404,15 +415,14 @@ public class Peer {
     /**
      * Functions that deals with the all process of killing the client
      * 
-     * @param peer The peer instance to get the global values.
      * @throws IOException If an I/O error occurs during the killing operations.
      */
-    private static void killClient(Peer peer) throws IOException {
-        deleteClientFile(peer.values[0]); // Clean up client file
-        deletePortLine(peer); // Clean up port line
-        peer.serverThread.closeServerSocket(); // Closes server socket
+    public void killClient() throws IOException {
+        deleteClientFile(this.values[0]); // Clean up client file
+        deletePortLine(this); // Clean up port line
+        this.serverThread.closeServerSocket(); // Closes server socket
         Users.clear(); // This will empty the list of users
-        deleteMessageFile(peer);
+        deleteMessageFile(this);
     }
 
     /**
@@ -593,7 +603,6 @@ public class Peer {
     private static void addShutdownHook(Peer peer) {
         // Register a new thread to be executed on program shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutdown hook triggered."); // Notify that the shutdown hook is activated
             try {
                 // Clean up the client file associated with the current user
                 deleteClientFile(peer.values[0]);
@@ -609,16 +618,15 @@ public class Peer {
      * Keeps the program running indefinitely until interrupted.
      */
     private static void keepProgramRunning() {
-        try {
-            // Sleep for a long time, keeping the program active
-            Thread.sleep(Long.MAX_VALUE);
-        } catch (InterruptedException e) {
-            // Handle the interruption and restore the interrupted status
-            Thread.currentThread().interrupt();
-            System.out.println("Program interrupted."); // Notify that the program was interrupted
-            // Exit the program with status code 0
-            System.exit(0);
-        }
+        new Thread(() -> {
+            try {
+                while (true) {
+                    Thread.sleep(1000);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -639,6 +647,7 @@ public class Peer {
 
                 File folder = new File("clients"); // Directory containing client files
                 String user = null;
+                String ip = null;
                 // Check if the directory exists
                 if (folder.exists() && folder.isDirectory()) {
                     File[] files = folder.listFiles(); // Iterate through the files in the directory
@@ -651,6 +660,7 @@ public class Peer {
                                     if (Integer.parseInt(filePort) == port) {
                                         user = file.getName(); // Retrieve the user ID from the file name
                                     }
+                                    ip = reader.readLine(); // Read the port from the client file
                                 } catch (IOException e) {
                                 }
                             }
@@ -658,7 +668,7 @@ public class Peer {
                     }
                 }
                 // Create or update the user based on the retrieved username and port
-                createUser(user, port);
+                createUser(user, ip, port);
             }
         } catch (IOException e) {
         }
@@ -672,27 +682,31 @@ public class Peer {
      */
     private static boolean fileAndPortVerification(Peer peer) {
         // Check if the correct number of values was provided
-        if (peer.values.length != 2) {
-            System.out.println("=> error: input must be in the format 'id port' (e.g., Valeta 6969).");
-            return false;
+        boolean returnValue = true;
+        if (peer.values.length != 3) {
+            returnValue = false;
         }
 
-        String errorMessage = "";
         File filename = new File("clients/" + peer.values[0]); // Check if the ID already exists
-        if (filename.exists())
-            errorMessage = "ID"; // Set error message if ID already exists
+        if (filename.exists()) {
+            setRepeatedId(peer, true);
+        }
 
         // Check if the second value (port) is a valid number
         try {
             int port = Integer.parseInt(peer.values[1]);
             // Ensure the port number is within the valid range
             if (port <= 0 || port > 65535) {
-                System.out.println("=> error: port must be a number between 1 and 65535.");
-                return false;
+                returnValue = false;
             }
         } catch (NumberFormatException e) {
-            System.out.println("=> error: port must be a valid number.");
-            return false;
+            returnValue = false;
+        }
+
+        // Validate the IP address
+        String ip = peer.values[2];
+        if (!isValidIP(ip)) {
+            returnValue = false;
         }
 
         // Check if the port is already in use
@@ -706,11 +720,8 @@ public class Peer {
                             String filePort = reader.readLine(); // Read the port from the client file
                             // Check if the port already exists
                             if (filePort.equals(peer.values[1])) {
-                                // Build appropriate error message based on conflicts
-                                if (errorMessage.equals(""))
-                                    errorMessage = "Port";
-                                else
-                                    errorMessage = "ID and Port";
+                                setRepeatedPort(peer, true);
+                                returnValue = false;
                             }
                         } catch (IOException e) {
                         }
@@ -721,11 +732,30 @@ public class Peer {
 
         // If no errors were found, return true; otherwise, notify the user of the
         // conflict
-        if (errorMessage.equals(""))
-            return true;
+        return returnValue;
+    }
 
-        System.out.println("=> " + errorMessage + " already in use, please insert a different " + errorMessage + ":");
-        return false;
+    /**
+     * This method accepts IPv4 addresses in the standard format (xxx.xxx.xxx.xxx),
+     * where each "xxx" is a number between 0 and 255, in addition to the value
+     * "localhost".
+     *
+     * @param ip The string representing the IP address to be validated.
+     * @return true if the IP address is valid or if it is "localhost";
+     *         false otherwise.
+     */
+    private static boolean isValidIP(String ip) {
+
+        if (ip.equals("localhost")) {
+            return true;
+        }
+
+        String ipRegex = "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+
+        return ip.matches(ipRegex);
     }
 
     /**
@@ -747,6 +777,67 @@ public class Peer {
             }
         }
         return null; // Return null if no matching user is found
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------------------//
+    // ----------------------------------------------------GETTERS-AND-SETTERS------------------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
+    /**
+     * Gets the VerificationStatus of the peer.
+     *
+     * @return The VerificationStatus of the peer.
+     */
+    public String[] getValues() {
+        return values;
+    }
+
+    /**
+     * Gets the VerificationStatus of the peer.
+     *
+     * @return The VerificationStatus of the peer.
+     */
+    public boolean getVerificationStatus() {
+        return verificationStatus;
+    }
+
+    /**
+     * Sets the VerificationStatus of the peer.
+     */
+    public static void setVerificationStatus(Peer peer, boolean bool) {
+        peer.verificationStatus = bool;
+    }
+
+    /**
+     * Gets the RepeatedId of the peer.
+     *
+     * @return The RepeatedId of the peer.
+     */
+    public boolean getRepeatedId() {
+        return repeatedId;
+    }
+
+    /**
+     * Sets the RepeatedId of the peer.
+     */
+    public static void setRepeatedId(Peer peer, boolean bool) {
+        peer.repeatedId = bool;
+    }
+
+    /**
+     * Gets the RepeatedPort of the peer.
+     *
+     * @return The RepeatedPort of the peer.
+     */
+    public boolean getRepeatedPort() {
+        return repeatedPort;
+    }
+
+    /**
+     * Sets the RepeatedPort of the peer.
+     */
+    public static void setRepeatedPort(Peer peer, boolean bool) {
+        peer.repeatedPort = bool;
     }
 
 }
