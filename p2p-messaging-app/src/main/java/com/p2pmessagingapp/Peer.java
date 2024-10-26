@@ -37,7 +37,7 @@ public class Peer {
     private SSLSocket sslSocket; // SSL socket for secure communication
     private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
     private PeerServer serverThread; // Thread for the peer server
-    private final static List<User> Users = new ArrayList<>(); // Creates a list of users
+    private List<User> Users = new ArrayList<>(); // Creates a list of users
     private boolean verificationStatus; // Boolean that checks the values of this peer
     private boolean repeatedId; // Boolean that checks the values of this peer
     private boolean repeatedPort; // Boolean that checks the values of this peer
@@ -109,94 +109,41 @@ public class Peer {
     /**
      * Asks the user for the ID of the peer they want to communicate with.
      * 
-     * @param peer           The peer instance to get the global values.
-     * @param bufferedReader The BufferedReader to read input from the user.
-     * @param id             The ID of the current user.
-     * @param serverThread   The thread handling server operations.
-     * @throws Exception If an error occurs during the communication setup.
+     * @param otherPeerID Id of the peer we want to communicate with.
+     * @return True if the input was valid, false otherwise.
      */
-    private static void askForcommunication(Peer peer, BufferedReader bufferedReader, String id,
-            PeerServer serverThread)
-            throws Exception {
+    public boolean checkscommunication(String otherPeerID) throws Exception {
 
-        // Prompt the user to enter the ID of the peer they want to communicate with
-        System.out.println(
-                "=> Please enter the ID of the person you want to communicate with below ('%% exit' to exit):");
-        String otherPeerID;
         User receiverUser = null;
 
-        // Continuously prompt for input until a valid ID is provided or the user opts
-        // to exit
-        while (true) {
-            // Read the ID entered by the user
-            otherPeerID = bufferedReader.readLine();
+        // Update the list of active peers
+        updateActivePeers();
 
-            // Check if the user wants to exit the communication
-            if (otherPeerID.equals("%% exit")) {
-                peer.killClient(peer);
-                peer.startPeer(peer.values);
-            }
+        // Find the user associated with the entered ID
+        receiverUser = findReceiver(otherPeerID);
 
-            // Update the list of active peers
-            updateActivePeers();
-
-            // Find the user associated with the entered ID
-            receiverUser = findReceiver(otherPeerID);
-
-            // If no user is found, prompt for a different ID
-            if (receiverUser == null) {
-                System.out.println("=> Invalid ID, please insert a different ID ('%% exit' to exit):");
-            } else {
-                // A valid receiver has been found, exit the loop
-                break;
-            }
-        }
-
-        // Start communication with the identified user
-        communicate(peer, bufferedReader, id, serverThread, receiverUser, peer.sslSocket);
+        // If no user is found, prompt for a different ID
+        if (receiverUser == null)
+            return false;
+        else
+            return true;
     }
 
     /**
      * Handles the communication between users.
      *
-     * @param peer           The peer instance to get the global values.
-     * @param bufferedReader The BufferedReader to read messages from the user.
-     * @param id             The ID of the current user.
-     * @param serverThread   The thread handling server operations.
-     * @param receiver       The user to communicate with.
-     * @param sslSocket      The secure socket for communication.
+     * @param receiver The user to communicate with.
+     * @param content  The content of the message that is going to be sent.
      */
-    private static void communicate(Peer peer, BufferedReader bufferedReader, String id, PeerServer serverThread,
-            User receiver,
-            SSLSocket sslSocket) {
+    private void communicate(User receiver, String content) {
 
         createChatDir();
-        String filename = createChat(id, receiver.getId());
-        try {
-            // Inform the user that communication can now begin
-            System.out.println("=>You can now communicate ('%% exit' to exit, '%% change' to change)");
+        String filename = createChat(this.values[0], receiver.getId());
 
-            OUTER: while (true) {
-                // Read user input for the message
-                String content = bufferedReader.readLine();
-                switch (content) {
-                    case "%% exit":
-                        // Exit the communication
-                        peer.killClient(peer);
-                        break OUTER; // Break out of the loop
-                    case "%% change":
-                        // Change the peer for communication
-                        Users.clear();
-                        askForcommunication(peer, bufferedReader, id, serverThread); // Prompt for a new peer
-                        break;
-                    default:
-                        // Create a message and send it to the receiver
-                        Message message = new Message(Users.get(0), receiver, content, filename);
-                        serverThread.sendMessage(message); // Send the message through the server thread
-                        break;
-                }
-            }
-            peer.startPeer(peer.values); // Return to the start peer interface
+        // Create a message and send it to the receiver
+        Message message = new Message(Users.get(0), receiver, content, filename);
+        try {
+            this.serverThread.sendMessage(message); // Send the message through the server thread
         } catch (Exception e) {
         }
     }
@@ -227,8 +174,8 @@ public class Peer {
      * @param ip   The ip address of the user.
      * @param port The port number associated with the user.
      */
-    private static void createUserAtributtes(Peer peer, String id, String ip, int port) {
-        createPortsFile(port);
+    private void createUserAtributtes(Peer peer, String id, String ip, int port) {
+        this.createPortsFile(port);
         createSSLSocket(peer, ip, port);
         createClientFile(id, ip, port);
         createUser(id, ip, port);
@@ -239,9 +186,9 @@ public class Peer {
      *
      * @param port The port number to be written to the file.
      */
-    private static void createPortsFile(int port) {
+    private void createPortsFile(int port) {
         boolean alreadyExists = false;
-        for (User user : Users) { // Checks if the port is already written in the Ports file
+        for (User user : this.Users) { // Checks if the port is already written in the Ports file
             if (user.getPort() == port)
                 alreadyExists = true;
         }
@@ -338,16 +285,16 @@ public class Peer {
      * @param ip   The ip address of the user.
      * @param port The port number associated with the user.
      */
-    private static void createUser(String id, String ip, int port) {
+    private void createUser(String id, String ip, int port) {
         boolean canCreateUser = true;
-        for (User user : Users) {
+        for (User user : this.Users) {
             if (user.getId().equals(id)) { // Check if the user ID matches the given ID
                 canCreateUser = false; // User already exists
             }
         }
         if (canCreateUser) {
             User user = new User(id, ip, port);
-            Users.add(user); // Add the new user to the list
+            this.Users.add(user); // Add the new user to the list
         }
     }
 
@@ -609,6 +556,7 @@ public class Peer {
                 deleteClientFile(peer.values[0]);
                 // Clean up the port line associated with the current client
                 deletePortLine(peer); // Passes the current client's port
+                deleteMessageFile(peer);
                 peer.sslSocket.close();
             } catch (IOException e) {
             }
@@ -638,7 +586,7 @@ public class Peer {
      * Updates the list of active peers by reading ports and matching them with
      * client files.
      */
-    public static void updateActivePeers() {
+    public void updateActivePeers() {
         File portsFile = new File("Ports"); // File containing the list of ports
         try (BufferedReader br = new BufferedReader(new FileReader(portsFile))) {
             String line;
@@ -669,7 +617,8 @@ public class Peer {
                     }
                 }
                 // Create or update the user based on the retrieved username and port
-                createUser(user, ip, port);
+                if (!user.equals(this.values[0]))
+                    createUser(user, ip, port);
             }
         } catch (IOException e) {
         }
@@ -766,12 +715,12 @@ public class Peer {
      * @param id The ID of the user to find.
      * @return The User object if found; null otherwise.
      */
-    private static User findReceiver(String id) {
+    private User findReceiver(String id) {
         // Iterate through the list of active users
-        for (User user : Users) {
+        for (User user : this.Users) {
             try {
                 // Check if the ID matches and it is not the current user
-                if (user.getId().equals(id) && !user.getId().equals(Users.get(0).getId())) {
+                if (user.getId().equals(id) && !user.getId().equals(this.Users.get(0).getId())) {
                     return user; // Return the found user
                 }
             } catch (NullPointerException e) {
