@@ -8,6 +8,7 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
+            height: 100vh;
             padding: 0;
         }
 
@@ -55,16 +56,16 @@
 
         /* New small add contact icon */
         .add-contact-icon {
-            width: 45px;
-            margin-right: 15px;
+            width: 40px;
+            margin-right: 2px;
             cursor: pointer;
         }
         /* Dropdown for add contact */
         .dropdown-add-contact {
             display: none; /* Hidden by default */
             position: absolute;
-            top: 52px; 
-            right: 80px; 
+            top: 120px; 
+            left: 150px; 
             background-color: white;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             padding: 15px;
@@ -133,6 +134,81 @@
             background-color: #1c86ee;
         }
 
+        /* Main content layout */
+        .content {
+            display: flex;
+            flex-grow: 1;
+            width: 100%;
+            height: calc(100vh - 60px);
+        }
+
+        /* Left panel for conversations */
+        .conversations-panel {
+            width: 35%;
+            max-width: 400px;
+            justify-content: space-between; 
+            background-color: #f7f7f7;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            height: calc(100vh - 60px);
+        }
+
+        /* Header for conversations */
+        .conversations-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between; 
+            background-color: #e8e8e8;
+            padding: 15px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            border-bottom: 1px solid #ddd;
+        }
+
+        /* Style for conversation list */
+        .conversation-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .conversation-list li {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        .conversation-list li:hover {
+            background-color: #e8e8e8;
+        }
+
+        .conversation-list li.active {
+            background-color: #1e90ff;
+            color: white;
+        }
+
+        .conversation-list img {
+            border-radius: 50%;
+            width: 40px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        .conversation-container {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .conversation-container:hover {
+            background-color: #f0f0f0;
+        }
+        .conversation-container.active {
+            background-color: #1e90ff;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -144,7 +220,6 @@
         <div class="center-section">
             <h1>CryptaLink</h1>
         </div>
-        <img src="/images/add_contact.png" class="add-contact-icon" id="addContactIcon" onclick="toggleAddContactDropdown()">
         <div class="right-section">
             <img src="/images/user.png" id="userIcon" onclick="toggleDropdown()">
             <!-- Dropdown content -->
@@ -157,9 +232,28 @@
         </div>
     </div>
     <div class="dropdown-add-contact" id="addContactDropdown">
-        <p>Talk with</p>
-        <input type="text" placeholder="Enter contact name">
-        <button>Start Chat</button>
+        <h2>Talk with:</h2>
+        <p id="errorMessage" style="color: red; display: none;">User doesn't exist.</p>
+        <p id="errorMessage1" style="color: red; display: none;">This is your own name.</p>
+        <input type="text" id="contactName" placeholder="Enter contact name">
+        <button onclick="startChat()">Start Chat</button>
+    </div>
+    <div class="content">
+        <!-- Conversations list on the left -->
+        <div class="conversations-panel">
+            <div class="conversations-header">
+                <span>Conversas</span>
+                <img src="/images/add_contact.png" class="add-contact-icon" id="addContactIcon" onclick="toggleAddContactDropdown()">
+            </div>
+            <ul class="conversation-list">
+                <li th:each="contact : ${contacts}" 
+                    <div class="conversation-container" th:data-contact="${contact}" onclick="selectConversation(this)">
+                        <img src="/images/user.png">
+                        <span th:text="${contact}"></span>
+                    </div>
+                </li>
+            </ul>
+        </div>
     </div>
 
     <script>
@@ -185,6 +279,10 @@
         function toggleAddContactDropdown() {
             var userDropdown = document.getElementById('userDropdown');
             var addContactDropdown = document.getElementById('addContactDropdown');
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('errorMessage1').style.display = 'none';
+            document.getElementById('contactName').value = null;
+
             
             // If the User dropdown is open, close it
             if (userDropdown.style.display === 'block') {
@@ -220,6 +318,63 @@
             .catch(error => {
                 console.error('Error during logout:', error);
             });
+        }
+
+        function startChat() {
+            var contactName = document.getElementById('contactName').value;
+            var urlParams = new URLSearchParams(window.location.search);
+            var peerId = urlParams.get('peerId');;
+    
+            fetch('/startChat?peerId=' + peerId + '&contactName=' + contactName , {
+                method: 'POST',
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result === 'exists') {
+                    addConversation(contactName);
+                } else if (result === 'not found') {
+                    document.getElementById('errorMessage').style.display = 'block';
+                } else if (result === 'your own name') {
+                    document.getElementById('errorMessage1').style.display = 'block';
+                }
+                else {
+                    console.error('An error occurred.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    
+        function addConversation(contactName) {
+            var conversationList = document.querySelector('.conversation-list');
+            var exists = Array.from(conversationList.children).some(item => item.textContent.trim() === contactName);
+            if (!exists) {
+                var newConversation = document.createElement('li');
+                newConversation.classList.add('conversation-container');
+                newConversation.setAttribute('data-contact', contactName);
+                newConversation.innerHTML = '<img src="/images/user.png"> ' + contactName;
+                
+                newConversation.onclick = function () {
+                    selectConversation(newConversation);
+                };
+        
+                conversationList.appendChild(newConversation);
+        
+                // Ativa a nova conversa
+                selectConversation(newConversation);
+            }
+            document.getElementById('errorMessage').style.display = 'none'; 
+            document.getElementById('addContactDropdown').style.display = 'none'; 
+        }
+
+        function selectConversation(element) {
+            document.querySelectorAll('.conversation-container').forEach(conversation => {
+                conversation.classList.remove('active');
+            });
+        
+            element.classList.add('active');
+            const contact = element.getAttribute("data-contact");
         }
     </script>
 
