@@ -17,7 +17,7 @@
             justify-content: space-between;
             align-items: center;
             background-color: #f0f8ff;
-            padding: 10px 20px;
+            height: 10vh;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
@@ -27,6 +27,7 @@
         }
         .top-bar .left-section img {
             width: 40px;
+            margin-left: 10px;
         }
 
         .top-bar .center-section {
@@ -51,6 +52,7 @@
         }
         .top-bar .right-section img {
             width: 40px;
+            margin-right: 10px;
             cursor: pointer;
         }
 
@@ -64,7 +66,7 @@
         .dropdown-add-contact {
             display: none; /* Hidden by default */
             position: absolute;
-            top: 120px; 
+            top: 125px; 
             left: 150px; 
             background-color: white;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -103,13 +105,14 @@
         .dropdown {
             display: none; 
             position: absolute;
-            top: 40px; 
-            right: 0;
+            top: 45px; 
+            right: 10px;
             background-color: white;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             padding: 15px;
             border-radius: 5px;
             width: 200px;
+            z-index: 1;
         }
 
         .dropdown p {
@@ -134,43 +137,38 @@
             background-color: #1c86ee;
         }
 
-        /* Main content layout */
         .content {
             display: flex;
-            flex-grow: 1;
-            width: 100%;
-            height: calc(100vh - 60px);
+            height: 90vh;
         }
 
-        /* Left panel for conversations */
         .conversations-panel {
-            width: 35%;
-            max-width: 400px;
-            justify-content: space-between; 
+            width: 30%; 
+            max-width: 400px; 
             background-color: #f7f7f7;
             border-right: 1px solid #ddd;
-            overflow-y: auto;
-            height: calc(100vh - 60px);
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Header for conversations */
         .conversations-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: space-between; 
-            background-color: #e8e8e8;
             padding: 15px;
+            background-color: #e8e8e8;
             font-size: 1.5em;
             font-weight: bold;
             color: #333;
             border-bottom: 1px solid #ddd;
         }
 
-        /* Style for conversation list */
         .conversation-list {
             list-style: none;
             padding: 0;
             margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
         }
 
         .conversation-list li {
@@ -183,24 +181,16 @@
             background-color: #e8e8e8;
         }
 
-        .conversation-list li.active {
-            background-color: #1e90ff;
-            color: white;
-        }
-
-        .conversation-list img {
-            border-radius: 50%;
-            width: 40px;
-            vertical-align: middle;
-            margin-right: 10px;
-        }
-
         .conversation-container {
             display: flex;
             align-items: center;
             padding: 10px;
-            cursor: pointer;
-            transition: background-color 0.3s;
+        }
+
+        .conversation-container img {
+            border-radius: 50%;
+            width: 40px;
+            margin-right: 10px;
         }
         .conversation-container:hover {
             background-color: #f0f0f0;
@@ -208,6 +198,121 @@
         .conversation-container.active {
             background-color: #1e90ff;
             color: white;
+        }
+
+        .chat-panel {
+            display: flex;
+            position: absolute;
+            top: 10vh;
+            left: 26.5%; 
+            background-color: white;
+            width: 73.6%;
+            height: 90vh;
+        }
+
+        .waiting-message img {
+            max-width: 200px;
+            margin-top: 200px;
+            margin-left: 450px;
+            margin-bottom: 20px;
+        }
+
+        .waiting-message p {
+            font-size: 1.2em;
+            margin-top: 10px;
+            margin-left: 400px;
+            color: #555;
+        }
+
+        .chat-active-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: white;
+            width: 73.6%;
+            height: 90vh;
+            padding: 20px;
+            position: absolute;
+            top: 10vh;
+            left: 26.5%;
+        }
+        
+        .chat-messages {
+            display: flex;
+            flex-grow: 1;
+            overflow-y: auto;
+            flex-direction: column;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            height: calc(100% - 60px);
+        }
+        
+        .message {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            max-width: 70%;
+            word-wrap: break-word;
+            position: relative;
+        }
+        
+        .message .sender {
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 7px;
+        }
+        
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #555;
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+        }
+        
+        .message.sent {
+            background-color: #d1e7ff;
+            align-self: flex-end;
+            text-align: right;
+            margin-right: 30px;
+        }
+        
+        .message.received {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+            text-align: left;
+            margin-left: 10px;
+        }
+        
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #555;
+            display: block;
+        }  
+
+        .message-input-container {
+            display: flex;
+            align-items: center;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            margin-bottom: 40px;
+            margin-right: 35px;
+        }
+    
+        .message-input-container input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 30px;
+        }
+    
+        .message-input-container img {
+            width: 40px;
+            cursor: pointer;
+            margin-right: 20px;
         }
     </style>
 </head>
@@ -255,6 +360,23 @@
             </ul>
         </div>
     </div>
+    <!-- Right panel for chat content or waiting message -->
+    <div class="chat-panel" id="chatPanel">
+        <div class="waiting-message">
+            <img src="/images/waiting.png" alt="Waiting">
+            <p>Click in a chat to talk with someone!</p>
+        </div>
+    </div>
+    <div class="chat-active-panel" id="chatActivePanel" style="display: none;">
+        <div class="chat-messages">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="message-input-container">
+            <p id="errorMessage2" style="color: red; display: none;">User is not online, please wait.</p>
+            <input type="text" id="messageInput" placeholder="Type your message here..." required> 
+            <img src="/images/send.png" alt="Send" id="sendMessage" onclick="sendMessage()">
+        </div>
+    </div>
 
     <script>
         // Toggle the user dropdown
@@ -283,7 +405,6 @@
             document.getElementById('errorMessage1').style.display = 'none';
             document.getElementById('contactName').value = null;
 
-            
             // If the User dropdown is open, close it
             if (userDropdown.style.display === 'block') {
                 userDropdown.style.display = 'none';
@@ -323,7 +444,7 @@
         function startChat() {
             var contactName = document.getElementById('contactName').value;
             var urlParams = new URLSearchParams(window.location.search);
-            var peerId = urlParams.get('peerId');;
+            var peerId = urlParams.get('peerId');
     
             fetch('/startChat?peerId=' + peerId + '&contactName=' + contactName , {
                 method: 'POST',
@@ -348,7 +469,7 @@
     
         function addConversation(contactName) {
             var conversationList = document.querySelector('.conversation-list');
-            var exists = Array.from(conversationList.children).some(item => item.textContent.trim() === contactName);
+            var exists = Array.from(conversationList.children).find(item => item.textContent.trim() === contactName);
             if (!exists) {
                 var newConversation = document.createElement('li');
                 newConversation.classList.add('conversation-container');
@@ -361,9 +482,9 @@
         
                 conversationList.appendChild(newConversation);
         
-                // Ativa a nova conversa
                 selectConversation(newConversation);
             }
+            selectConversation(exists);
             document.getElementById('errorMessage').style.display = 'none'; 
             document.getElementById('addContactDropdown').style.display = 'none'; 
         }
@@ -375,7 +496,123 @@
         
             element.classList.add('active');
             const contact = element.getAttribute("data-contact");
+
+            // Get peerId and contactName
+            var urlParams = new URLSearchParams(window.location.search);
+            var peerId = urlParams.get('peerId');;
+            var contactName = element.getAttribute("data-contact");
+
+            toggleChatPanel();
+
+            // Load chat messages
+            loadChatMessages(peerId, contactName);
+
+            startPollingForMessages(peerId, contactName);
         }
+
+        function toggleChatPanel() {
+            const chatPanel = document.getElementById('chatPanel');
+            const chatActivePanel = document.getElementById('chatActivePanel');
+            const activeConversation = document.querySelector('.conversation-container.active');
+
+            // Show chatActivePanel if a conversation is active; otherwise, show chatPanel
+            if (activeConversation) {
+                chatPanel.style.display = 'none';
+                chatActivePanel.style.display = 'flex';
+            } else {
+                chatPanel.style.display = 'flex';
+                chatActivePanel.style.display = 'none';
+            }
+        }
+
+
+        function loadChatMessages(peerId, contactName) {
+            const chatMessagesContainer = document.querySelector('.chat-messages');
+            chatMessagesContainer.innerHTML = ''; // Clear existing messages
+        
+            fetch(`/loadChat?peerId=${peerId}&contactName=${contactName}`)
+                .then(response => response.json())
+                .then(messages => {
+                    messages.forEach(message => {
+                        const messageElement = document.createElement('div');
+                        messageElement.classList.add('message');
+        
+                        const [timestampAndSender, messageContent] = message.split('] ');
+                        const [fullTimestamp, sender] = timestampAndSender.split('-[');
+                        const senderId = sender.replace('[', '').replace(']', '');
+        
+                        const time = fullTimestamp.split('T')[1].substring(0, 5); 
+        
+                        if (senderId === peerId) {
+                            // Mensagem enviada pelo próprio utilizador (sem o nome)
+                            messageElement.classList.add('sent');
+                            messageElement.innerHTML = `
+                                <p>${messageContent}</p>
+                                <span class="timestamp">${time}</span>
+                            `;
+                        } else {
+                            // Mensagem recebida (com o nome do remetente)
+                            messageElement.classList.add('received');
+                            messageElement.innerHTML = `
+                                <span class="sender">${senderId}</span>
+                                <p>${messageContent}</p>
+                                <span class="timestamp">${time}</span>
+                            `;
+                        }
+        
+                        chatMessagesContainer.appendChild(messageElement);
+                    });
+                    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+                })
+                .catch(error => {
+                    console.error('Error loading messages:', error);
+                });
+        }
+
+        function sendMessage() {
+            document.getElementById('errorMessage2').style.display = 'none';
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+        
+            if (message) {
+                const activeConversation = document.querySelector('.conversation-container.active');
+                const contactName = activeConversation.getAttribute("data-contact");
+                
+                var urlParams = new URLSearchParams(window.location.search);
+                var peerId = urlParams.get('peerId');
+                // Clear the input field after sending
+                fetch('/sendMessage?peerId=' + peerId + '&contactName=' + contactName + '&message=' + message, {
+                    method: 'POST',
+                })
+                .then(response => response.text())
+                .then(result => {
+                    if (result === 'success') {
+                        loadChatMessages(peerId,contactName);
+                    } else if (result === 'not found') {
+                        document.getElementById('errorMessage2').style.display = 'block';
+                    }
+                    else {
+                        console.error('An error occurred.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+
+                messageInput.value = '';
+            }
+        }
+
+        function startPollingForMessages(peerId, contactName) {
+            setInterval(() => {
+                loadChatMessages(peerId, contactName);
+            }, 5000); 
+        }
+
+        // Initial check on page load
+        document.addEventListener('DOMContentLoaded', toggleChatPanel);
+        
+
     </script>
 
 </body>
