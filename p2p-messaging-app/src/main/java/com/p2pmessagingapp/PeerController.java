@@ -2,6 +2,8 @@ package com.p2pmessagingapp;
 
 import java.io.IOException;
 import java.io.File;
+import java.io.BufferedReader;
+import java.io.FileReader;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -141,6 +143,50 @@ public class PeerController {
                 return "not found";
         }
         return "error";
+    }
+
+    @GetMapping("/loadChat")
+    @ResponseBody
+    public List<String> loadChat(@RequestParam("peerId") String peerId,
+            @RequestParam("contactName") String contactName) {
+        List<String> messages = new ArrayList<>();
+        String fileName = "chats/" + peerId + "-" + contactName;
+
+        // Check if file exists with "peerId-contactName" or "contactName-peerId"
+        File chatFile = new File(fileName);
+        if (!chatFile.exists()) {
+            chatFile = new File("chats/" + contactName + "-" + peerId);
+        }
+
+        // Read the chat file if it exists
+        if (chatFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new FileReader(chatFile))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    messages.add(line); // Add each line (message) to the list
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return messages;
+    }
+
+    // Endpoint to handle sending of a message
+    @PostMapping("/sendMessage")
+    @ResponseBody
+    public String sendMessage(@RequestParam("peerId") String peerId,
+            @RequestParam("contactName") String contactName,
+            @RequestParam("message") String message) {
+        Peer peer = peerMap.get(peerId);
+        peer.updateActivePeers();
+        User receiver = peer.findReceiver(contactName);
+        if (receiver == null)
+            return "not found";
+        else {
+            peer.communicate(receiver, message);
+            return "success";
+        }
     }
 
     // Endpoint to handle logout and kill the peer client

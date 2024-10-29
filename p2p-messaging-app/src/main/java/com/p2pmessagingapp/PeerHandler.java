@@ -54,7 +54,6 @@ public class PeerHandler extends Thread {
                 Message message = (Message) objectInputStream.readObject();
                 writeOnChat(message.getTime() + "-" + "[" + message.getSender().getId() + "] " + message.getContent(),
                         message.getFileName());
-                System.out.println("[" + message.getSender().getId() + "] " + message.getContent());
                 break; // Exit after reading the first message (consider removing this break for
                        // continuous listening)
             }

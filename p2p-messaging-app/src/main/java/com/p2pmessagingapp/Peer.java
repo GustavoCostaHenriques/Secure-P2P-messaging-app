@@ -115,12 +115,11 @@ public class Peer {
     public boolean checkscommunication(String otherPeerID) throws Exception {
 
         User receiverUser = null;
-
         // Update the list of active peers
-        updateActivePeers();
+        this.updateActivePeers();
 
         // Find the user associated with the entered ID
-        receiverUser = findReceiver(otherPeerID);
+        receiverUser = this.findReceiver(otherPeerID);
 
         // If no user is found, prompt for a different ID
         if (receiverUser == null)
@@ -135,7 +134,7 @@ public class Peer {
      * @param receiver The user to communicate with.
      * @param content  The content of the message that is going to be sent.
      */
-    private void communicate(User receiver, String content) {
+    public void communicate(User receiver, String content) {
 
         createChatDir();
         String filename = createChat(this.values[0], receiver.getId());
@@ -617,8 +616,9 @@ public class Peer {
                     }
                 }
                 // Create or update the user based on the retrieved username and port
-                if (!user.equals(this.values[0]))
+                if (!user.equals(this.values[0])) {
                     createUser(user, ip, port);
+                }
             }
         } catch (IOException e) {
         }
@@ -715,7 +715,7 @@ public class Peer {
      * @param id The ID of the user to find.
      * @return The User object if found; null otherwise.
      */
-    private User findReceiver(String id) {
+    public User findReceiver(String id) {
         // Iterate through the list of active users
         for (User user : this.Users) {
             try {
