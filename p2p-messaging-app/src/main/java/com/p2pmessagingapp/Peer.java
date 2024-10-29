@@ -586,6 +586,7 @@ public class Peer {
      * client files.
      */
     public void updateActivePeers() {
+        Users.subList(1, Users.size()).clear();
         File portsFile = new File("Ports"); // File containing the list of ports
         try (BufferedReader br = new BufferedReader(new FileReader(portsFile))) {
             String line;
