@@ -453,6 +453,7 @@
             .then(result => {
                 if (result === 'exists') {
                     addConversation(contactName);
+                    addContactDropdown.style.display = 'none';
                 } else if (result === 'not found') {
                     document.getElementById('errorMessage').style.display = 'block';
                 } else if (result === 'your own name') {
