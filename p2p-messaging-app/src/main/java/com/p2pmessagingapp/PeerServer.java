@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.net.SocketException;
-import java.io.File;
 
 import java.security.KeyManagementException;
 import java.security.KeyStore;
@@ -31,6 +30,9 @@ public final class PeerServer extends Thread {
     private SSLServerSocket serverSocket; // SSLServerSocket to accept secure connections
     private Peer peer; // Peer instance to handle communication with a connected peer
     private PeerHandler peerHandler;
+    private boolean serverCreated = false;
+    private String contentFromServer = null; // content of the message that is going to be sent from the user
+    private User userSearched = null; // user that this peer is trying to find
 
     /**
      * Constructs a PeerServer instance that creates an SSL server socket on the
@@ -49,10 +51,8 @@ public final class PeerServer extends Thread {
      * protocol.
      *
      * @param port The port number on which the server socket will listen.
-     * @throws IOException If an error occurs during the creation of the
-     *                     SSLServerSocket.
      */
-    public void createSSLServerSocket(int port) throws IOException {
+    public void createSSLServerSocket(int port) {
         try {
             SSLContext context = SSLContext.getInstance("TLSv1.2"); // Create SSL context for TLS 1.2
             KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -78,10 +78,13 @@ public final class PeerServer extends Thread {
                                                                                               // context
             SSLServerSocketFactory factory = context.getServerSocketFactory(); // Create the server socket factory
             serverSocket = (SSLServerSocket) factory.createServerSocket(port); // Create the SSLServerSocket
+            serverCreated = true;
 
+        } catch (IOException e) {
+            serverCreated = false;
         } catch (NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException | CertificateException
                 | KeyManagementException e) {
-            e.printStackTrace(); // Print stack trace for debugging
+            e.printStackTrace(); // Outras exceções de SSL e de I/O
         }
     }
 
@@ -116,7 +119,7 @@ public final class PeerServer extends Thread {
                                                // connections.
                 SSLSocket sslSocket = (SSLSocket) serverSocket.accept(); // Accept the connection and return a
                                                                          // Socket
-                peerHandler = new PeerHandler(sslSocket); // Create a new PeerHandler for the connection
+                peerHandler = new PeerHandler(sslSocket, this); // Create a new PeerHandler for the connection
                 peerHandler.start(); // Start the PeerHandler thread
             }
         } catch (SocketException e) {
@@ -135,38 +138,10 @@ public final class PeerServer extends Thread {
      * @throws Exception If an error occurs during the sending process.
      */
     public void sendMessage(Message message) throws Exception {
-        boolean isAlive = checkIfPeerIsAlive(message.getReceiver().getId()); // Checks if the receptor is alive
-        if (!isAlive) {
-            System.out.println("=> " + message.getReceiver().getId()
-                    + " is not online right now. Please try again later or write '%% change' to talk with another person or '%% exit' to exit.");
-        } else {
-            peer = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
-                    message.getReceiver().getPort()); // Create a Peer instance for the receiver
-            byte[] serializedMessage = serializeMessage(message); // Serialize the message
-            peer.sendMessage(serializedMessage); // Send the serialized message to the peer
-        }
-    }
-
-    /**
-     * Checks if the peer that the client wants to send a message to is alive.
-     * 
-     * @param peerId Id of the peer the client wants to send a message to.
-     * @return True if the is alive, false otherwise.
-     */
-    private static boolean checkIfPeerIsAlive(String peerId) {
-        File folder = new File("clients"); // Directory containing client files
-        // Check if the directory exists
-        if (folder.exists() && folder.isDirectory()) {
-            File[] files = folder.listFiles(); // Iterate through the files in the directory
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isFile() && file.getName().equals(peerId)) { // Check if the current item is a file
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        peer = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
+                message.getReceiver().getPort()); // Create a Peer instance for the receiver
+        byte[] serializedMessage = serializeMessage(message); // Serialize the message
+        peer.sendMessage(serializedMessage); // Send the serialized message to the peer
     }
 
     /**
@@ -178,5 +153,61 @@ public final class PeerServer extends Thread {
         if (serverSocket != null) { // Checks if server is null
             serverSocket.close();
         }
+    }
+
+    /**
+     * Gets the serverCreated variable of the server.
+     *
+     * @return The serverCreated variable of the server.
+     */
+    public boolean getServerCreated() {
+        return serverCreated;
+    }
+
+    /**
+     * Gets the content of the message sent from the server.
+     *
+     * @return The content of the message sent from the server.
+     */
+    public String getContentFromTheServer() {
+        return contentFromServer;
+    }
+
+    /**
+     * Sets the content from the server to the content value.
+     *
+     * @param content The content that is going to replace the value of the
+     *                contentFromServer.
+     */
+    public void setContentFromTheServer(String content) {
+        System.out.println("Entrou aqui e vai meter no servidor " + this.serverSocket.getLocalPort() + " content como: "
+                + content);
+        this.contentFromServer = content;
+    }
+
+    /**
+     * Gets the user sent from the server.
+     *
+     * @return The user sent from the server.
+     */
+    public User getUserSearched() {
+        return userSearched;
+    }
+
+    /**
+     * Sets the userSearched to the user value.
+     * 
+     * @param user The user that is going to replace the value of the userSearched.
+     */
+    public void setUserSearched(User user) {
+        if (user != null) {
+            System.out
+                    .println("Entrou aqui e vai meter no servidor " + this.serverSocket.getLocalPort() + " user como: "
+                            + user.getId());
+        } else {
+            System.out.println(
+                    "Entrou aqui e vai meter no servidor " + this.serverSocket.getLocalPort() + " user como null");
+        }
+        this.userSearched = user;
     }
 }

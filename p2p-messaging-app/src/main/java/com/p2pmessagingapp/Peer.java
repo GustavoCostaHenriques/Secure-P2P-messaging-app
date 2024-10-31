@@ -1,14 +1,11 @@
 package com.p2pmessagingapp;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.ObjectOutputStream;
 
 import java.security.KeyManagementException;
 import java.security.KeyStore;
@@ -17,15 +14,13 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
+
+import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 
 /**
  * The Peer class represents a peer in the P2P messaging application.
@@ -35,12 +30,19 @@ import javax.net.ssl.TrustManagerFactory;
 public class Peer {
 
     private SSLSocket sslSocket; // SSL socket for secure communication
+    private SSLSocket sslServerSocket; // SSL server socket for communication with server
     private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
     private PeerServer serverThread; // Thread for the peer server
-    private List<User> Users = new ArrayList<>(); // Creates a list of users
-    private boolean verificationStatus; // Boolean that checks the values of this peer
-    private boolean repeatedId; // Boolean that checks the values of this peer
-    private boolean repeatedPort; // Boolean that checks the values of this peer
+    private boolean verificationStatus = true; // Boolean that checks the values of this peer
+    private boolean repeatedId = false; // Boolean that checks the values of this peer
+    private boolean repeatedPort = false; // Boolean that checks the values of this peer
+    private User user; // User that will be created for this peer
+    private final String serverIp = "localhost"; // IP of the server that has information about other peers
+    private final int serverPort = 2222; // Port of the server that has information about other peers
+    private volatile String serverResponse; // Using 'volatile' on serverResponse to ensure visibility across threads
+                                            // and prevent infinite loop due to caching issues
+    private volatile User userFound; // Using 'volatile' on serverResponse to ensure visibility across threads and
+                                     // prevent infinite loop due to caching issues
 
     /**
      * The startPeer method serves as the entry point for the P2P messaging
@@ -59,25 +61,47 @@ public class Peer {
             this.values[i] = args[i];
         }
 
-        setRepeatedId(this, false); // In each cycle we assume that the ID is going to be valid
-        setRepeatedId(this, false); // In each cycle we assume that the Port is going to be valid
+        serverThread = new PeerServer(Integer.parseInt(this.values[1]));
 
-        this.verificationStatus = fileAndPortVerification(this); // Verify input values
+        if (!serverThread.getServerCreated()) {
+            setRepeatedPort(this, true);
+            setVerificationStatus(this, false);
+        }
 
-        setVerificationStatus(this, this.verificationStatus);
+        if (!isValidIP(this.values[2])) {
+            setVerificationStatus(this, false);
+        }
+
         if (this.verificationStatus) {
-            // Start the peer server on the specified port
-            this.serverThread = new PeerServer(Integer.parseInt(this.values[1]));
-            this.serverThread.start();
+            serverThread.start();
 
-            // Create user attributes based on user input
-            createUserAtributtes(this, this.values[0], this.values[2], Integer.parseInt(this.values[1]));
+            sslSocket = createSSLSocket(this.values[2], Integer.parseInt(this.values[1])); // Socket to
+                                                                                           // communicate with
+                                                                                           // other peers.
+            sslServerSocket = createSSLSocket(serverIp, serverPort); // Socket to
+                                                                     // communicate
+                                                                     // with the
+                                                                     // server.
+            user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null);
+            sendMessageToServer(user);
 
-            // Prompt the user for a peer to communicate with
-            // askForcommunication(this, this.bufferedReader, this.values[0],
-            // this.serverThread);
+            // Wait for the server response
+            serverResponse = serverThread.getContentFromTheServer();
+            while (serverResponse == null) {
+                serverResponse = serverThread.getContentFromTheServer();
+            }
+            if (serverResponse.equals("1-error")) {
+                System.out.println("Id já em uso");
+                setVerificationStatus(this, false);
+                setRepeatedId(this, true);
+                serverThread.closeServerSocket();
+            }
+            serverThread.setContentFromTheServer(null);
             // Keep the program running indefinitely
             keepProgramRunning();
+        } else {
+            if (serverThread.getServerCreated())
+                serverThread.closeServerSocket();
         }
     }
 
@@ -92,7 +116,7 @@ public class Peer {
         this.values[0] = id;
         this.values[1] = String.valueOf(port);
         this.values[2] = ip;
-        createUserAtributtes(this, id, ip, port); // Create user attributes for a new peer
+        this.sslSocket = createSSLSocket(ip, port);
     }
 
     /**
@@ -110,22 +134,25 @@ public class Peer {
      * Asks the user for the ID of the peer they want to communicate with.
      * 
      * @param otherPeerID Id of the peer we want to communicate with.
-     * @return True if the input was valid, false otherwise.
+     * @return The User that the server sends (this user can have the id equal to
+     *         "NULL" meaning that the user was not found).
      */
-    public boolean checkscommunication(String otherPeerID) throws Exception {
+    public User checkscommunication(String otherPeerID) throws Exception {
 
-        User receiverUser = null;
-        // Update the list of active peers
-        this.updateActivePeers();
+        User receiverUser = new User(values[0], null, 0000, otherPeerID);
+        sendMessageToServer(receiverUser);
 
-        // Find the user associated with the entered ID
-        receiverUser = this.findReceiver(otherPeerID);
+        // Wait for the server response
+        userFound = serverThread.getUserSearched();
+        while (userFound == null) {
+            userFound = serverThread.getUserSearched();
+        }
 
-        // If no user is found, prompt for a different ID
-        if (receiverUser == null)
-            return false;
-        else
-            return true;
+        System.out.println("Saiu do ciclo");
+
+        serverThread.setUserSearched(null);
+
+        return userFound;
     }
 
     /**
@@ -135,12 +162,14 @@ public class Peer {
      * @param content  The content of the message that is going to be sent.
      */
     public void communicate(User receiver, String content) {
+        System.out.println("User id: " + receiver.getId());
 
         createChatDir();
         String filename = createChat(this.values[0], receiver.getId());
 
         // Create a message and send it to the receiver
-        Message message = new Message(Users.get(0), receiver, content, filename);
+        Message message = new Message(user, receiver, content, filename);
+
         try {
             this.serverThread.sendMessage(message); // Send the message through the server thread
         } catch (Exception e) {
@@ -161,67 +190,39 @@ public class Peer {
         }
     }
 
+    /**
+     * Sends a serialized user through the secure server socket.
+     * 
+     * @param user The user to be serialized and sent.
+     */
+    private void sendMessageToServer(User user) {
+        if (sslServerSocket == null || sslServerSocket.isClosed())
+            sslServerSocket = createSSLSocket(serverIp, serverPort);
+        try (OutputStream outputStream = sslServerSocket.getOutputStream();) {
+            byte[] serializedUser = serializeUser(user);
+            // Send a message based on user data
+            outputStream.write(serializedUser);
+            outputStream.flush(); // Ensure the message is sent immediately
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     // -----------------------------------------------------------------------------------------------------------------------------//
     // ---------------------------------------------USER-MANAGEMENT-AND-SSLSOCKET-SETUP---------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
 
     /**
-     * Creates user attributes by initializing necessary files and SSL socket.
-     *
-     * @param peer The peer instance to get the global values.
-     * @param id   The id of the user.
-     * @param ip   The ip address of the user.
-     * @param port The port number associated with the user.
-     */
-    private void createUserAtributtes(Peer peer, String id, String ip, int port) {
-        this.createPortsFile(port);
-        createSSLSocket(peer, ip, port);
-        createClientFile(id, ip, port);
-        createUser(id, ip, port);
-    }
-
-    /**
-     * Creates a file to store port information if it does not already exist.
-     *
-     * @param port The port number to be written to the file.
-     */
-    private void createPortsFile(int port) {
-        boolean alreadyExists = false;
-        for (User user : this.Users) { // Checks if the port is already written in the Ports file
-            if (user.getPort() == port)
-                alreadyExists = true;
-        }
-        File portFile;
-        if (!alreadyExists) {
-            try {
-                portFile = new File("Ports");
-                portFile.createNewFile();
-                BufferedWriter writer;
-                try (Scanner sc = new Scanner(portFile)) {
-                    writer = new BufferedWriter(new FileWriter(portFile, true)); // append mode
-                    while (sc.hasNextLine()) {
-                        sc.nextLine();
-                    }
-                }
-                writer.write(String.valueOf(port)); // write the port in the file
-                writer.write(System.getProperty("line.separator"));
-                writer.close();
-
-            } catch (IOException e) {
-            }
-        }
-    }
-
-    /**
      * Creates an SSL socket for secure communication with the specified ip address
-     * and
-     * port.
+     * and port.
      *
-     * @param peer The peer instance to get the global values.
      * @param ip   The ip address to connect to.
      * @param port The port number to connect to.
+     * @return socket The socket that the peer wants to create.
      */
-    private static void createSSLSocket(Peer peer, String ip, int port) {
+    private static SSLSocket createSSLSocket(String ip, int port) {
+        SSLSocket socket = null;
         try {
             SSLContext context = SSLContext.getInstance("TLSv1.2");
             KeyManagerFactory keyManager = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -242,59 +243,13 @@ public class Peer {
 
             context.init(keyManager.getKeyManagers(), trustManager.getTrustManagers(), null);
             SSLSocketFactory factory = context.getSocketFactory();
-            peer.sslSocket = (SSLSocket) factory.createSocket(ip, port);
+            socket = (SSLSocket) factory.createSocket(ip, port);
+            System.out.println("Criou o socket");
 
         } catch (IOException | NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException
                 | CertificateException | KeyManagementException e) {
         }
-    }
-
-    /**
-     * Creates a client file for the user with the specified ID and writes the port
-     * number to it.
-     *
-     * @param id   The identifier of the user.
-     * @param ip   The ip address of the user.
-     * @param port The port number to be written in the client file.
-     */
-    private static void createClientFile(String id, String ip, int port) {
-        try {
-            File dir = new File("clients");
-            if (!dir.exists()) {
-                dir.mkdir(); // Create the directory if it does not exist
-            }
-
-            File file = new File(dir, id);
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-                writer.write(String.valueOf(port)); // write the port in the file
-                writer.write(System.getProperty("line.separator"));
-                writer.write(ip);
-            } // write the port in the file
-
-        } catch (IOException e) {
-            // Handle the exception appropriately
-        }
-    }
-
-    /**
-     * Creates a new user with the specified ID and port if the user does not
-     * already exist.
-     *
-     * @param id   The identifier of the user.
-     * @param ip   The ip address of the user.
-     * @param port The port number associated with the user.
-     */
-    private void createUser(String id, String ip, int port) {
-        boolean canCreateUser = true;
-        for (User user : this.Users) {
-            if (user.getId().equals(id)) { // Check if the user ID matches the given ID
-                canCreateUser = false; // User already exists
-            }
-        }
-        if (canCreateUser) {
-            User user = new User(id, ip, port);
-            this.Users.add(user); // Add the new user to the list
-        }
+        return socket;
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -365,95 +320,12 @@ public class Peer {
      * @throws IOException If an I/O error occurs during the killing operations.
      */
     public void killClient(Peer peer) throws IOException {
-        deleteClientFile(peer.values[0]); // Clean up client file
-        deletePortLine(peer); // Clean up port line
-        peer.serverThread.closeServerSocket(); // Closes server socket
-        Users.clear(); // peer will empty the list of users
+        System.out.println("Chegou aqui");
         deleteMessageFile(peer);
-    }
-
-    /**
-     * Deletes the client file associated with the given user ID.
-     *
-     * @param userId The ID of the user whose client file is to be deleted.
-     */
-    private static void deleteClientFile(String userId) {
-        // Create a directory object for the "clients" directory
-        File dir = new File("clients");
-
-        // Check if the directory exists and is indeed a directory
-        if (dir.exists() && dir.isDirectory()) {
-            // Create a file object for the user's specific client file
-            File userFile = new File(dir, userId);
-
-            // If the user file exists, delete it
-            if (userFile.exists()) {
-                userFile.delete();
-            }
-
-            // Check if the directory is now empty, and if so, delete the directory
-            if (dir.list().length == 0) {
-                dir.delete();
-            }
-        }
-    }
-
-    /**
-     * Deletes the Ports file if it exists.
-     */
-    private static void deletePortsFile() {
-        // Create a file object for the Ports file
-        File portsFile = new File("Ports");
-
-        // Check if the Ports file exists
-        if (portsFile.exists()) {
-            // If it exists, delete the Ports file
-            portsFile.delete();
-        }
-    }
-
-    /**
-     * Deletes a specific port line from the Ports file.
-     *
-     * @param peer The peer instance to get the global values.
-     * @throws IOException If an I/O error occurs during file operations.
-     */
-    private static void deletePortLine(Peer peer) throws IOException {
-        // Create a file object for the Ports file
-        File portsFile = new File("Ports");
-
-        // Use a BufferedReader to read the contents of the Ports file
-        try (BufferedReader reader = new BufferedReader(new FileReader(portsFile))) {
-            String line;
-            StringBuilder contents = new StringBuilder();
-
-            // Read each line from the Ports file
-            while ((line = reader.readLine()) != null) {
-                // Skip the line that matches the value to be deleted
-                if (line.equals(peer.values[1])) {
-                    continue;
-                }
-                // Append the line to the StringBuilder for the contents
-                contents.append(line).append(System.lineSeparator());
-            }
-            // Close the reader
-            reader.close();
-
-            // Write the modified contents back to the Ports file
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(portsFile))) {
-                writer.write(contents.toString());
-                writer.close();
-            }
-        }
-
-        // Check if the Ports file is now empty
-        try (BufferedReader reader = new BufferedReader(new FileReader(portsFile))) {
-            // If it is empty, delete the Ports file
-            if (reader.readLine() == null) {
-                reader.close();
-                deletePortsFile();
-            }
-        }
+        User user = new User(peer.values[0], null, 0000, null);
+        sendMessageToServer(user);
+        peer.serverThread.closeServerSocket(); // Closes server socket
+        System.out.println("Fechou o server");
     }
 
     /**
@@ -495,36 +367,22 @@ public class Peer {
                         }
 
                         // Flag to check if the other user (client) is online
-                        Boolean clientIsOnline = false;
+                        User clientIsOnline = null;
 
-                        // Define the "clients" folder where online clients are registered
-                        File clientsFolder = new File("clients");
-
-                        // Check if the "clients" directory exists and is a directory
-                        if (clientsFolder.exists() && clientsFolder.isDirectory()) {
-                            // Get the list of files inside the "clients" directory
-                            File[] clientsFiles = clientsFolder.listFiles();
-
-                            // If the directory contains files (non-null), process them
-                            if (clientsFiles != null) {
-                                // Loop through each file in the "clients" directory
-                                for (File clientFile : clientsFiles) {
-                                    // Ensure that the current item is a file and not a subdirectory
-                                    if (clientFile.isFile()) {
-                                        // Check if the filename matches the other user's name
-                                        if (clientFile.getName().equals(otherUser)) {
-                                            clientIsOnline = true; // Set the flag if the other user is online
-                                        }
-                                        break; // Exit the loop once the client is found
-                                    }
-                                }
+                        try {
+                            clientIsOnline = peer.checkscommunication(otherUser);
+                        } catch (Exception e) {
+                        }
+                        while (clientIsOnline == null) {
+                            try {
+                                Thread.sleep(1000); // Waits for 1 second (1000 milliseconds)
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
                             }
                         }
 
-                        // If the other user (client) is not online, delete the message file
-                        if (!clientIsOnline) {
+                        if (clientIsOnline.getId().equals("NULL"))
                             chatsFile.delete(); // Delete the chat file for the offline user
-                        }
                     }
                 }
             }
@@ -550,15 +408,7 @@ public class Peer {
     private static void addShutdownHook(Peer peer) {
         // Register a new thread to be executed on program shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                // Clean up the client file associated with the current user
-                deleteClientFile(peer.values[0]);
-                // Clean up the port line associated with the current client
-                deletePortLine(peer); // Passes the current client's port
-                deleteMessageFile(peer);
-                peer.sslSocket.close();
-            } catch (IOException e) {
-            }
+            deleteMessageFile(peer);
         }));
     }
 
@@ -580,112 +430,6 @@ public class Peer {
     // -----------------------------------------------------------------------------------------------------------------------------//
     // ----------------------------------------------------AUXILIARY-FUNCTIONS------------------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
-
-    /**
-     * Updates the list of active peers by reading ports and matching them with
-     * client files.
-     */
-    public void updateActivePeers() {
-        Users.subList(1, Users.size()).clear();
-        File portsFile = new File("Ports"); // File containing the list of ports
-        try (BufferedReader br = new BufferedReader(new FileReader(portsFile))) {
-            String line;
-            // Read each line (port) from the ports file
-            while ((line = br.readLine()) != null) {
-                int port = Integer.parseInt(line); // Parse the port number
-
-                File folder = new File("clients"); // Directory containing client files
-                String user = null;
-                String ip = null;
-                // Check if the directory exists
-                if (folder.exists() && folder.isDirectory()) {
-                    File[] files = folder.listFiles(); // Iterate through the files in the directory
-                    if (files != null) {
-                        for (File file : files) {
-                            if (file.isFile()) { // Check if the current item is a file
-                                try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                                    String filePort = reader.readLine(); // Read the port from the client file
-                                    // If the port matches, get the username from the file name
-                                    if (Integer.parseInt(filePort) == port) {
-                                        user = file.getName(); // Retrieve the user ID from the file name
-                                    }
-                                    ip = reader.readLine(); // Read the port from the client file
-                                } catch (IOException e) {
-                                }
-                            }
-                        }
-                    }
-                }
-                // Create or update the user based on the retrieved username and port
-                if (!user.equals(this.values[0])) {
-                    createUser(user, ip, port);
-                }
-            }
-        } catch (IOException e) {
-        }
-    }
-
-    /**
-     * Verifies the input values for a user ID and port.
-     * 
-     * @param peer The peer instance to get the global values.
-     * @return true if the values are valid; false otherwise.
-     */
-    private static boolean fileAndPortVerification(Peer peer) {
-        // Check if the correct number of values was provided
-        boolean returnValue = true;
-        if (peer.values.length != 3) {
-            returnValue = false;
-        }
-
-        File filename = new File("clients/" + peer.values[0]); // Check if the ID already exists
-        if (filename.exists()) {
-            setRepeatedId(peer, true);
-            returnValue = false;
-        }
-
-        // Check if the second value (port) is a valid number
-        try {
-            int port = Integer.parseInt(peer.values[1]);
-            // Ensure the port number is within the valid range
-            if (port <= 0 || port > 65535) {
-                returnValue = false;
-            }
-        } catch (NumberFormatException e) {
-            returnValue = false;
-        }
-
-        // Validate the IP address
-        String ip = peer.values[2];
-        if (!isValidIP(ip)) {
-            returnValue = false;
-        }
-
-        // Check if the port is already in use
-        File folder = new File("clients"); // Directory containing client files
-        if (folder.exists() && folder.isDirectory()) {
-            File[] files = folder.listFiles(); // Iterate through the files in the directory
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isFile()) { // Check if the current item is a file
-                        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                            String filePort = reader.readLine(); // Read the port from the client file
-                            // Check if the port already exists
-                            if (filePort.equals(peer.values[1])) {
-                                setRepeatedPort(peer, true);
-                                returnValue = false;
-                            }
-                        } catch (IOException e) {
-                        }
-                    }
-                }
-            }
-        }
-
-        // If no errors were found, return true; otherwise, notify the user of the
-        // conflict
-        return returnValue;
-    }
 
     /**
      * This method accepts IPv4 addresses in the standard format (xxx.xxx.xxx.xxx),
@@ -711,24 +455,31 @@ public class Peer {
     }
 
     /**
-     * Finds a user by their ID from the list of active users.
+     * Finds a user by their ID from the list of users in the server.
      * 
      * @param id The ID of the user to find.
-     * @return The User object if found; null otherwise.
      */
-    public User findReceiver(String id) {
-        // Iterate through the list of active users
-        for (User user : this.Users) {
-            try {
-                // Check if the ID matches and it is not the current user
-                if (user.getId().equals(id) && !user.getId().equals(this.Users.get(0).getId())) {
-                    return user; // Return the found user
-                }
-            } catch (NullPointerException e) {
-                return null; // Return null if an error occurs
-            }
+    public void findReceiver(String id) {
+        User receiverUser = new User(this.user.getId(), null, 0000, id);
+        sendMessageToServer(receiverUser);
+    }
+
+    /**
+     * Serializes a User object into a byte array for transmission.
+     *
+     * @param User The User object to be serialized.
+     * @return A byte array representing the serialized User.
+     * @throws IOException If an error occurs during serialization.
+     */
+    private static byte[] serializeUser(User user) throws IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        // Serialize the User object into a byte array
+        try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream)) {
+            objectOutputStream.writeObject(user); // Serializes object User
         }
-        return null; // Return null if no matching user is found
+
+        return byteArrayOutputStream.toByteArray(); // Return the byte array
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//

@@ -17,6 +17,7 @@ import javax.net.ssl.SSLSocket;
 public class PeerHandler extends Thread {
     private InputStream inputStream; // Input stream to read data from the socket
     private SSLSocket sslSocket; // SSL socket for secure communication with the peer
+    private PeerServer peerServer; // PeerServer that created this peerHandler
 
     /**
      * Constructs a PeerHandler instance with the specified SSL socket.
@@ -25,8 +26,9 @@ public class PeerHandler extends Thread {
      * @throws IOException If an error occurs while obtaining the input stream from
      *                     the socket.
      */
-    public PeerHandler(SSLSocket sslSocket) throws IOException {
+    public PeerHandler(SSLSocket sslSocket, PeerServer peerServer) throws IOException {
         this.sslSocket = sslSocket; // Initialize the SSL socket
+        this.peerServer = peerServer; // Initialize the peerServer
     }
 
     /**
@@ -52,8 +54,14 @@ public class PeerHandler extends Thread {
             while (true) {
                 // Block until an object is available to be read
                 Message message = (Message) objectInputStream.readObject();
-                writeOnChat(message.getTime() + "-" + "[" + message.getSender().getId() + "] " + message.getContent(),
-                        message.getFileName());
+                System.out.println("Recebeu mensagem de: " + message.getSender().getId());
+                if (message.getSender().getId().equals("SERVER")) {
+                    processServerMessage(message.getReceiver(), message.getContent());
+                } else {
+                    writeOnChat(
+                            message.getTime() + "-" + "[" + message.getSender().getId() + "] " + message.getContent(),
+                            message.getFileName());
+                }
                 break; // Exit after reading the first message (consider removing this break for
                        // continuous listening)
             }
@@ -94,4 +102,13 @@ public class PeerHandler extends Thread {
         }
     }
 
+    private void processServerMessage(User receiver, String content) {
+        if (content.charAt(0) == '2') {
+            peerServer.setUserSearched(receiver);
+        } else {
+            System.out.println("Will store a new value in the content from the server.");
+            peerServer.setContentFromTheServer(content);
+            System.out.println("Content from the server: " + peerServer.getContentFromTheServer());
+        }
+    }
 }

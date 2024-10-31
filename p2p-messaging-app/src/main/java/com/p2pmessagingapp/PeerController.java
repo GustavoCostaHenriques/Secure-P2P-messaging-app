@@ -83,9 +83,8 @@ public class PeerController {
     @GetMapping("/menu")
     public String menu(@RequestParam("peerId") String peerId, Model model) {
         Peer peer = peerMap.get(peerId);
-        if (peer == null) {
+        if (peer == null)
             return "error"; // Handle case where peer is not found
-        }
 
         String userId = peer.getValues()[0];
         String userPort = peer.getValues()[1];
@@ -107,11 +106,10 @@ public class PeerController {
                 if (fileName.contains("-")) {
                     String[] users = fileName.split("-");
                     if (users.length == 2) {
-                        if (users[0].equals(userId)) {
+                        if (users[0].equals(userId))
                             contacts.add(users[1]);
-                        } else if (users[1].equals(userId)) {
+                        else if (users[1].equals(userId))
                             contacts.add(users[0]);
-                        }
                     }
                 }
             }
@@ -132,12 +130,19 @@ public class PeerController {
         if (peer != null) {
             if (peerId.equals(contactName))
                 return "your own name";
-            boolean userExists = false;
+            User userExists = null;
             try {
                 userExists = peer.checkscommunication(contactName);
             } catch (Exception e) {
             }
-            if (userExists)
+            while (userExists == null) {
+                try {
+                    Thread.sleep(1000); // Waits for 1 second (1000 milliseconds)
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (!userExists.getId().equals("NULL"))
                 return "exists";
             else
                 return "not found";
@@ -154,9 +159,8 @@ public class PeerController {
 
         // Check if file exists with "peerId-contactName" or "contactName-peerId"
         File chatFile = new File(fileName);
-        if (!chatFile.exists()) {
+        if (!chatFile.exists())
             chatFile = new File("chats/" + contactName + "-" + peerId);
-        }
 
         // Read the chat file if it exists
         if (chatFile.exists()) {
@@ -179,9 +183,20 @@ public class PeerController {
             @RequestParam("contactName") String contactName,
             @RequestParam("message") String message) {
         Peer peer = peerMap.get(peerId);
-        peer.updateActivePeers();
-        User receiver = peer.findReceiver(contactName);
-        if (receiver == null)
+        User receiver = null;
+        System.out.println("Chegou ao send Message");
+        try {
+            receiver = peer.checkscommunication(contactName);
+        } catch (Exception e) {
+        }
+        while (receiver == null) {
+            try {
+                Thread.sleep(1000); // Waits for 1 second (1000 milliseconds)
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        if (receiver.getId().equals("NULL"))
             return "not found";
         else {
             peer.communicate(receiver, message);
