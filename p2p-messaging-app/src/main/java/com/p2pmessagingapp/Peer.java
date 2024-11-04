@@ -157,7 +157,7 @@ public class Peer {
         keyStoreFile = "peer_keystore_" + this.values[0] + ".jks";
         trustStoreFile = "peer_truststore_" + this.values[0] + ".jks";
         password = "p2pmessagingapp_" + this.values[0];
-        serverCertFile = "../server_certificate.crt";
+        serverCertFile = "server_certificate.crt";
 
         // Add the sender's certificate to the TrustStore for secure communication
         addPeerCertificateToTrustStore(sender, trustStoreFile, password);
