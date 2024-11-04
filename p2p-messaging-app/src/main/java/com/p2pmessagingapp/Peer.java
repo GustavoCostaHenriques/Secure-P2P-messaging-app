@@ -80,7 +80,7 @@ public class Peer {
         keyStoreFile = "peer_keystore_" + this.values[0] + ".jks";
         trustStoreFile = "peer_truststore_" + this.values[0] + ".jks";
         password = "p2pmessagingapp_" + this.values[0];
-        serverCertFile = "../server_certificate.crt";
+        serverCertFile = "server_certificate.crt";
 
         // Check if a KeyStore already exists for this peer to avoid duplicate entries
         File keyStore = new File(keyStoreFile);
