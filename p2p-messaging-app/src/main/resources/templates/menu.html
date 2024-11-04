@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu</title>
+    <link rel="stylesheet" href="/css/menu.css">
+</head>
+<body>
+    <div class="top-bar">
+        <div class="left-section">
+            <img src="/images/logo.png">
+        </div>
+        <div class="center-section">
+            <h1>CryptaLink</h1>
+        </div>
+        <div class="right-section">
+            <img src="/images/user.png" id="userIcon" onclick="toggleDropdown()">
+            <!-- Dropdown content -->
+            <div class="dropdown" id="userDropdown">
+                <p>Welcome, <strong th:if="${userId != null}" th:text="${userId}">!</strong></p>
+                <p>Port: <span th:if="${userPort != null}" th:text="${userPort}"></span></p>
+                <p>IP: <span th:if="${userIp != null}" th:text="${userIp}"></span></p>
+                <button onclick="logout()">End Session</button>
+            </div>
+        </div>
+    </div>
+    <div class="dropdown-add-contact" id="addContactDropdown">
+        <h2>Talk with:</h2>
+        <p id="errorMessage" style="color: red; display: none;">User doesn't exist.</p>
+        <p id="errorMessage1" style="color: red; display: none;">This is your own name.</p>
+        <input type="text" id="contactName" placeholder="Enter contact name">
+        <button onclick="startChat()">Start Chat</button>
+    </div>
+    <div class="content">
+        <!-- Conversations list on the left -->
+        <div class="conversations-panel">
+            <div class="conversations-header">
+                <span>Chats</span>
+                <img src="/images/add_contact.png" class="add-contact-icon" id="addContactIcon" onclick="toggleAddContactDropdown()">
+            </div>
+            <ul class="conversation-list">
+                <li th:each="contact : ${contacts}" 
+                    <div class="conversation-container" th:data-contact="${contact}" onclick="selectConversation(this)">
+                        <img src="/images/user.png">
+                        <span th:text="${contact}"></span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <!-- Right panel for chat content or waiting message -->
+    <div class="chat-panel" id="chatPanel">
+        <div class="waiting-message">
+            <img src="/images/waiting.png" alt="Waiting">
+            <p>Click in a chat to talk with someone!</p>
+        </div>
+    </div>
+    <div class="chat-active-panel" id="chatActivePanel" style="display: none;">
+        <div class="chat-messages">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="message-input-container">
+            <p id="errorMessage2" style="color: red; display: none;">User is not online, please wait.</p>
+            <input type="text" id="messageInput" placeholder="Type your message here..." required> 
+            <img src="/images/send.png" alt="Send" id="sendMessage" onclick="sendMessage()">
+        </div>
+    </div>
+    <script src="/js/menu.js"></script>
+</body>
+</html>

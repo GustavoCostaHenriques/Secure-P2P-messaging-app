@@ -1,0 +1,88 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #e6f2ff; 
+}
+.container {
+    background-color: white;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    width: 350px; 
+    position: relative; 
+}
+.container img {
+    cursor: pointer;
+}
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+}
+h2 {
+    color: #333;
+    margin: 0;
+}
+.logo {
+    width: 50px;
+}
+.go-back {
+    position: absolute; 
+    top: 20px;
+    left: 20px;
+    width: 30px; 
+}
+.error-small-id-message {
+    color: red;
+    font-size: 0.8em;
+    position: absolute;
+    top: 134px; /* Adjust this value as necessary */
+    margin-left: 22px;
+}
+.error-small-port-message {
+    color: red;
+    font-size: 0.8em;
+    position: absolute;
+    top: 220px; /* Adjust this value as necessary */
+    margin-left: 37px;
+}
+.error-message {
+    color: red;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+label {
+    display: block;
+    margin: 10px 0 5px;
+    color: #333;
+    font-weight: bold;
+    text-align: left;
+}
+input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+button {
+    padding: 10px 20px;
+    background-color: #1e90ff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 1em;
+    border-radius: 5px;
+    width: 50%;
+    transition: background-color 0.3s ease;
+}
+button:hover {
+    background-color: #1c86ee;
+}

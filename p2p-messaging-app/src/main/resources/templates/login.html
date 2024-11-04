@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Submission</title>
+    <link rel="stylesheet" href="/css/login.css">
+</head>
+<body>
+    <div class="container">
+        <img src="/images/go_back.png" onclick="window.location.href='/'" class="go-back">
+        <div class="header">
+            <img src="/images/logo.png" class="logo">
+        </div>
+        <div class="error-message">
+            <p th:if="${errorMessage != null}" th:text="${errorMessage}"></p>
+        </div>
+        <form action="/login" method="POST">
+            <label for="id">ID</label>
+            <div class="error-small-id-message">
+                <p th:if="${errorIdMessage != null}" th:text="${errorIdMessage}"></p>
+            </div>
+            <input type="text" id="id" name="id" required placeholder="Ex:Alice">
+
+            <label for="port">Port</label>
+            <div class="error-small-port-message">
+                <p th:if="${errorPortMessage != null}" th:text="${errorPortMessage}"></p>
+            </div>
+            <input type="text" id="port" name="port" required placeholder="Ex:1234">
+
+            <label for="ip">IP Address</label>
+            <input type="text" id="ip" name="ip" required placeholder="Ex:127.7.7.7 or 'localhost'">
+
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>
