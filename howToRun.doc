@@ -1,4 +1,3 @@
-1º - mvn clean install
-2º - mvn compile
-3º - mvn spring-boot:run
-4º - Open in the browser the URL "localhost:8080"
+1º - Run the main in the Server.java file
+2º - Run the main in the App.java file
+5º - Open in the browser the URL "localhost:8080"
