@@ -61,8 +61,10 @@ public class Server {
     private final static int port = 2222; // Port on which the server listens for peer connections
     private static SSLServerSocket serverSocket; // SSLServerSocket to accept secure connections
     private static List<User> userList = new ArrayList<>(); // List to store connected users
-    private static User serverUser = new User("SERVER", "localhost", 2222, null, null); // Represents the central server
-    private static User userNull = new User("NULL", "NULL", 0000, null, null); // Placeholder user if peer not found
+    private static User serverUser = new User("SERVER", "localhost", 2222, null, null, null); // Represents the central
+                                                                                              // server
+    private static User userNull = new User("NULL", "NULL", 0000, null, null, null); // Placeholder user if peer not
+                                                                                     // found
 
     // Define paths for keystore, truststore, and certificate files, and the
     // password

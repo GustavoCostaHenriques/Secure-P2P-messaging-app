@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -77,6 +78,7 @@ public class PeerController {
             @RequestParam("id") String id,
             @RequestParam("port") String port,
             @RequestParam("ip") String ip,
+            @RequestParam(value = "topics", required = false) List<String> topics,
             Model model) {
 
         String[] client_values = new String[3];
@@ -86,7 +88,7 @@ public class PeerController {
 
         Peer peer = new Peer();
         try {
-            peer.startPeer(client_values); // Initializes the peer with provided values
+            peer.startPeer(client_values, topics); // Initializes the peer with provided values
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -128,11 +130,13 @@ public class PeerController {
         String userId = peer.getValues()[0];
         String userPort = peer.getValues()[1];
         String userIp = peer.getValues()[2];
+        List<String> userInterests = peer.getInterests();
 
         // Pass peer details to the model for display in the menu
         model.addAttribute("userId", userId);
         model.addAttribute("userPort", userPort);
         model.addAttribute("userIp", userIp);
+        model.addAttribute("userInterests", userInterests);
 
         // Load all previous chats with contacts and add them to the model
         File chatDir = new File("chats");
@@ -265,6 +269,27 @@ public class PeerController {
             peer.communicate(receiver, message); // Send the message to the receiver
             return "success"; // Return success status
         }
+    }
+
+    /**
+     * Changes interests of the peer.
+     * 
+     * @param peerId The ID of the peer to be changed.
+     * @return sucess
+     */
+    @PostMapping("/saveChanges")
+    @ResponseBody
+    public String saveChanges(
+            @RequestParam("peerId") String peerId,
+            @RequestBody Map<String, List<String>> topicsMap) {
+        Peer peer = peerMap.get(peerId);
+
+        List<String> topics = topicsMap.get("topics");
+        if (peer != null) {
+            peer.setInterests(topics);
+        }
+
+        return "success";
     }
 
     /**

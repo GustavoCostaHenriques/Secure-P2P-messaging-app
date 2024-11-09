@@ -21,7 +21,41 @@
                 <p>Welcome, <strong th:if="${userId != null}" th:text="${userId}">!</strong></p>
                 <p>Port: <span th:if="${userPort != null}" th:text="${userPort}"></span></p>
                 <p>IP: <span th:if="${userIp != null}" th:text="${userIp}"></span></p>
-                <button onclick="logout()">End Session</button>
+                <span id="noInterestsMessage" th:if="${userInterests == null || userInterests.isEmpty()}" th:text="'No interests selected.'" style="display:block">No interests selected.</span>
+                <div id="interestsContainer" style="display: none;">
+                    <button onclick="toggleInterestsList()" id="toggleInterestsButton">Show Interests</button>
+                    <ul id="interestsList" class="scrollable-list" style="display: none;">
+                        <li th:each="interest : ${userInterests}" th:text="${interest}">Interest</li>
+                    </ul>
+                </div>              
+                <div class="dropdown_interests">
+                    <button type="button" class="dropdown_interests-button" onclick="toggleDropdown_interests()">Change Interest</button>
+                    <div id="dropdown_interests-menu" class="dropdown_interests-menu">
+                        <label><span>Technology</span> <input type="checkbox" name="topics" value="Technology"></label>
+                        <label><span>Sports and Fitness</span> <input type="checkbox" name="topics" value="Sports and Fitness"></label>
+                        <label><span>Travel</span> <input type="checkbox" name="topics" value="Travel"></label>
+                        <label><span>Music</span> <input type="checkbox" name="topics" value="Music"></label>
+                        <label><span>Movies and TV</span> <input type="checkbox" name="topics" value="Movies and TV"></label>
+                        <label><span>Reading and Literature</span> <input type="checkbox" name="topics" value="Reading and Literature"></label>
+                        <label><span>Health and Wellness</span> <input type="checkbox" name="topics" value="Health and Wellness"></label>
+                        <label><span>Food and Cooking</span> <input type="checkbox" name="topics" value="Food and Cooking"></label>
+                        <label><span>Nature and Sustainability</span> <input type="checkbox" name="topics" value="Nature and Sustainability"></label>
+                        <label><span>Art and Culture</span> <input type="checkbox" name="topics" value="Art and Culture"></label>
+                        <label><span>Science and Innovation</span> <input type="checkbox" name="topics" value="Science and Innovation"></label>
+                        <label><span>History</span> <input type="checkbox" name="topics" value="History"></label>
+                        <label><span>Animals and Pets</span> <input type="checkbox" name="topics" value="Animals and Pets"></label>
+                        <label><span>Personal Development</span> <input type="checkbox" name="topics" value="Personal Development"></label>
+                        <label><span>Gaming and Entertainment</span> <input type="checkbox" name="topics" value="Gaming and Entertainment"></label>
+                        <label><span>Fashion and Style</span> <input type="checkbox" name="topics" value="Fashion and Style"></label>
+                        <label><span>Politics and Society</span> <input type="checkbox" name="topics" value="Politics and Society"></label>
+                        <label><span>Photography</span> <input type="checkbox" name="topics" value="Photography"></label>
+                        <label><span>Spirituality and Meditation</span> <input type="checkbox" name="topics" value="Spirituality and Meditation"></label>
+                        <label><span>Education and Learning</span> <input type="checkbox" name="topics" value="Education and Learning"></label>
+                    </div>
+                </div>
+                <button class="dropdown-button" onclick="saveChanges()">Save Changes</button>
+
+                <button class="dropdown-button" onclick="logout()">End Session</button>
             </div>
         </div>
     </div>

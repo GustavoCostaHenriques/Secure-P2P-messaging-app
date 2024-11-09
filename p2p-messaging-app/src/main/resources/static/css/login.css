@@ -86,3 +86,66 @@ button {
 button:hover {
     background-color: #1c86ee;
 }
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.dropdown-button {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: white;
+    font-size: 1em;
+    color: #333;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dropdown-button:after {
+    content: "▼";
+    font-size: 0.8em;
+    float: right;
+    margin-right: 10px;
+    color: #888;
+}
+
+.dropdown-button:hover {
+    background-color: white;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    max-height: 150px; 
+    overflow-y: auto;
+    width: calc(100% - 22px);
+    z-index: 1;
+}
+
+.dropdown-menu label {
+    display: flex;
+    align-items: center;
+    margin: 5px 0;
+    font-size: 0.9em;
+    text-align: left;
+}
+
+.dropdown-menu label span {
+    width: 500px; 
+    display: inline-block;
+}
+
+
+.dropdown-menu input[type="checkbox"] {
+    justify-self: end; 
+}

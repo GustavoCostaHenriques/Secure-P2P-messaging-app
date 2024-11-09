@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Submission</title>
     <link rel="stylesheet" href="/css/login.css">
+
 </head>
 <body>
     <div class="container">
@@ -31,8 +32,36 @@
             <label for="ip">IP Address</label>
             <input type="text" id="ip" name="ip" required placeholder="Ex:127.7.7.7 or 'localhost'">
 
+            <label for="topics">Topics of Interest</label>
+            <div class="dropdown">
+                <button type="button" class="dropdown-button" onclick="toggleDropdown()">Choose Interest</button>
+                <div id="dropdown-menu" class="dropdown-menu">
+                    <label><span>Technology</span> <input type="checkbox" name="topics" value="Technology"></label>
+                    <label><span>Sports and Fitness</span> <input type="checkbox" name="topics" value="Sports and Fitness"></label>
+                    <label><span>Travel</span> <input type="checkbox" name="topics" value="Travel"></label>
+                    <label><span>Music</span> <input type="checkbox" name="topics" value="Music"></label>
+                    <label><span>Movies and TV</span> <input type="checkbox" name="topics" value="Movies and TV"></label>
+                    <label><span>Reading and Literature</span> <input type="checkbox" name="topics" value="Reading and Literature"></label>
+                    <label><span>Health and Wellness</span> <input type="checkbox" name="topics" value="Health and Wellness"></label>
+                    <label><span>Food and Cooking</span> <input type="checkbox" name="topics" value="Food and Cooking"></label>
+                    <label><span>Nature and Sustainability</span> <input type="checkbox" name="topics" value="Nature and Sustainability"></label>
+                    <label><span>Art and Culture</span> <input type="checkbox" name="topics" value="Art and Culture"></label>
+                    <label><span>Science and Innovation</span> <input type="checkbox" name="topics" value="Science and Innovation"></label>
+                    <label><span>History</span> <input type="checkbox" name="topics" value="History"></label>
+                    <label><span>Animals and Pets</span> <input type="checkbox" name="topics" value="Animals and Pets"></label>
+                    <label><span>Personal Development</span> <input type="checkbox" name="topics" value="Personal Development"></label>
+                    <label><span>Gaming and Entertainment</span> <input type="checkbox" name="topics" value="Gaming and Entertainment"></label>
+                    <label><span>Fashion and Style</span> <input type="checkbox" name="topics" value="Fashion and Style"></label>
+                    <label><span>Politics and Society</span> <input type="checkbox" name="topics" value="Politics and Society"></label>
+                    <label><span>Photography</span> <input type="checkbox" name="topics" value="Photography"></label>
+                    <label><span>Spirituality and Meditation</span> <input type="checkbox" name="topics" value="Spirituality and Meditation"></label>
+                    <label><span>Education and Learning</span> <input type="checkbox" name="topics" value="Education and Learning"></label>
+                </div>
+            </div>
+
             <button type="submit">Login</button>
         </form>
     </div>
+    <script src="/js/login.js"></script>
 </body>
 </html>

@@ -2,6 +2,9 @@ package com.p2pmessagingapp;
 
 import java.io.Serializable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import java.security.cert.X509Certificate;
 
 /**
@@ -18,6 +21,7 @@ public class User implements Serializable {
     private final int port; // Port number associated with the user
     private final String receiverId; // Identifier of the user that this user wants to find (possibly null)
     private final X509Certificate certificate; // Certificate associated with the user
+    private List<String> interests = new ArrayList<>(); // List of interests of this user
 
     /**
      * Constructs a User instance with a given ID, IP, port, receiverId, and
@@ -29,12 +33,14 @@ public class User implements Serializable {
      * @param receiverId  The ID of the user this user wants to communicate with.
      * @param certificate The X509Certificate of the user.
      */
-    public User(String id, String ip, int port, String receiverId, X509Certificate certificate) {
+    public User(String id, String ip, int port, String receiverId, X509Certificate certificate,
+            List<String> interests) {
         this.id = id;
         this.ip = ip;
         this.port = port;
         this.receiverId = receiverId;
         this.certificate = certificate;
+        this.interests = interests;
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -84,5 +90,25 @@ public class User implements Serializable {
      */
     public X509Certificate getCertificate() {
         return certificate;
+    }
+
+    /**
+     * Gets the interests of the user.
+     *
+     * @return The interests of the user.
+     */
+    public List<String> getInterests() {
+        return interests;
+    }
+
+    /**
+     * Sets the interests of the user.
+     * 
+     * @param interests New list of interests of this user
+     *
+     * @return The interests of the user.
+     */
+    public void setInterests(List<String> interests) {
+        this.interests = interests;
     }
 }

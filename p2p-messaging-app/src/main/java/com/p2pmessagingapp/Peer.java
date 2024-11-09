@@ -10,6 +10,9 @@ import java.io.OutputStream;
 import java.io.ObjectOutputStream;
 import java.io.FileOutputStream;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import java.math.BigInteger;
 
 import java.security.*;
@@ -43,6 +46,7 @@ public class Peer {
     private SSLSocket sslSocket; // SSL socket for secure communication
     private SSLSocket sslServerSocket; // SSL server socket for communication with server
     private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
+    private List<String> interests = new ArrayList<>(); // List of interests
     private PeerServer serverThread; // Thread for the peer server
     private boolean verificationStatus = true; // Boolean that checks the values of this peer
     private boolean repeatedId = false; // Boolean that checks the values of this peer
@@ -67,7 +71,7 @@ public class Peer {
      * @param args Arguments received from the submissionForm in the PeerController.
      * @throws Exception If an error occurs during initialization or communication.
      */
-    public void startPeer(String[] args) throws Exception {
+    public void startPeer(String[] args, List<String> interests) throws Exception {
         // Adds a shutdown hook to delete client and port files/directories upon exiting
         addShutdownHook(this); // Triggered by pressing 'Control + C'
 
@@ -75,6 +79,7 @@ public class Peer {
         for (int i = 0; i < 3; i++) {
             this.values[i] = args[i];
         }
+        this.interests = interests;
 
         // Define paths and passwords for KeyStore and TrustStore files
         keyStoreFile = "peer_keystore_" + this.values[0] + ".jks";
@@ -98,7 +103,7 @@ public class Peer {
         addServerCertToPeerTrustStore(trustStoreFile, password, serverCertFile);
 
         // Create a User object with peer's details (for later communication)
-        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert);
+        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests);
 
         // Add peer's own certificate to TrustStore for secure, mutual authentication
         addPeerCertificateToTrustStore(user, trustStoreFile, password);
@@ -147,7 +152,7 @@ public class Peer {
      * @param sender The User object representing the sender creating this peer.
      * @throws Exception If an error occurs during initialization.
      */
-    public Peer(String id, String ip, int port, User sender) throws Exception {
+    public Peer(String id, String ip, int port, List<String> interests, User sender) throws Exception {
         // Initialize the peer's basic details
         this.values[0] = id;
         this.values[1] = String.valueOf(port);
@@ -163,7 +168,7 @@ public class Peer {
         addPeerCertificateToTrustStore(sender, trustStoreFile, password);
 
         // Create a User instance for this peer with the given ID, IP, and port
-        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert);
+        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests);
 
         // Create an SSL socket for secure communication with the given IP and port
         this.sslSocket = createSSLSocket(ip, port, keyStoreFile, trustStoreFile, password);
@@ -194,7 +199,7 @@ public class Peer {
      */
     public User checkscommunication(String otherPeerID) throws Exception {
 
-        User receiverUser = new User(values[0], null, 0000, otherPeerID, null);
+        User receiverUser = new User(values[0], null, 0000, otherPeerID, null, null);
         sendMessageToServer(receiverUser);
 
         // Wait for the server response
@@ -530,7 +535,7 @@ public class Peer {
      */
     public void killClient(Peer peer) throws IOException {
         deleteMessageFile(peer);
-        User user = new User(peer.values[0], null, 0000, null, null);
+        User user = new User(peer.values[0], null, 0000, null, null, null);
         sendMessageToServer(user);
         peer.serverThread.closeServerSocket(); // Closes server socket
         deleteSecureFiles(peer);
@@ -682,7 +687,7 @@ public class Peer {
      * @param id The ID of the user to find.
      */
     public void findReceiver(String id) {
-        User receiverUser = new User(this.user.getId(), null, 0000, id, null);
+        User receiverUser = new User(this.user.getId(), null, 0000, id, null, null);
         sendMessageToServer(receiverUser);
     }
 
@@ -704,17 +709,35 @@ public class Peer {
         return byteArrayOutputStream.toByteArray(); // Return the byte array
     }
 
+    /**
+     * Changes the interests of a User.
+     *
+     * @param interests The interests updated to change.
+     */
+    public void setInterests(List<String> interests) {
+        user.setInterests(interests);
+    }
+
     // -----------------------------------------------------------------------------------------------------------------------------//
     // ----------------------------------------------------GETTERS-AND-SETTERS------------------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
 
     /**
-     * Gets the VerificationStatus of the peer.
+     * Gets the values of the peer.
      *
-     * @return The VerificationStatus of the peer.
+     * @return The values of the peer.
      */
     public String[] getValues() {
         return values;
+    }
+
+    /**
+     * Gets the interests of the peer.
+     *
+     * @return The interests of the peer.
+     */
+    public List<String> getInterests() {
+        return interests;
     }
 
     /**

@@ -141,7 +141,11 @@ public final class PeerServer extends Thread {
      */
     public void sendMessage(Message message) throws Exception {
         peer = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
-                message.getReceiver().getPort(), message.getSender()); // Create a Peer instance for the receiver
+                message.getReceiver().getPort(), message.getReceiver().getInterests(), message.getSender()); // Create a
+                                                                                                             // Peer
+                                                                                                             // instance
+                                                                                                             // for the
+                                                                                                             // receiver
         byte[] serializedMessage = serializeMessage(message); // Serialize the message
         peer.sendMessage(serializedMessage); // Send the serialized message to the peer
     }

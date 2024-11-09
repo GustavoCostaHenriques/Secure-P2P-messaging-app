@@ -37,6 +37,64 @@ function toggleAddContactDropdown() {
     }
 }
 
+function toggleInterestsList() {
+    var interestsList = document.getElementById("interestsList");
+    var toggleButton = document.getElementById("toggleInterestsButton");
+
+    if (interestsList.style.display === "none" || interestsList.style.display === "") {
+        interestsList.style.display = "block";
+        toggleButton.textContent = "Hide Interests";
+    } else {
+        interestsList.style.display = "none";
+        toggleButton.textContent = "Show Interests";
+    }
+}
+
+function saveChanges() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var peerId = urlParams.get('peerId');
+
+    var selectedTopics = [];
+    document.querySelectorAll('#dropdown_interests-menu input[type="checkbox"]:checked').forEach(checkbox => {
+        selectedTopics.push(checkbox.value);
+    });
+
+    fetch('/saveChanges?peerId=' + peerId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ topics: selectedTopics })
+    })
+    .then(response => {
+        if (response.ok) {
+            const noInterestsMessage = document.getElementById('noInterestsMessage');
+            const interestsContainer = document.getElementById('interestsContainer');
+            const interestsList = document.getElementById('interestsList');
+            interestsList.innerHTML = ""; 
+
+            if (selectedTopics.length > 0) {
+                if (noInterestsMessage) noInterestsMessage.style.display = "none";
+                interestsContainer.style.display = "block";
+                selectedTopics.forEach(topic => {
+                    const li = document.createElement('li');
+                    li.textContent = topic;
+                    interestsList.appendChild(li);
+                });
+            } else {
+                if (noInterestsMessage) noInterestsMessage.style.display = "none";
+                interestsContainer.style.display = "none";
+            }
+
+            toggleDropdown_interests();
+            toggleDropdown();
+        } else {
+            console.error("Failed to update interests.");
+        }
+    })
+    .catch(error => console.error("Error:", error));
+}
+
 function logout() {
     // Get the peerId from the current URL
     var urlParams = new URLSearchParams(window.location.search);
@@ -230,6 +288,39 @@ function startPollingForMessages(peerId, contactName) {
         loadChatMessages(peerId, contactName);
     }, 5000); 
 }
+
+function toggleDropdown_interests() {
+    var dropdownMenu = document.getElementById("dropdown_interests-menu");
+    if (dropdownMenu.style.display === "none" || dropdownMenu.style.display === "") {
+        dropdownMenu.style.display = "block";
+    } else {
+        dropdownMenu.style.display = "none";
+    }
+}
+
+window.addEventListener("click", function(event) {
+    var dropdownButton = document.querySelector(".dropdown_interests-button");
+    var dropdownMenu = document.getElementById("dropdown_interests-menu");
+
+    if (!dropdownButton.contains(event.target) && !dropdownMenu.contains(event.target)) {
+        dropdownMenu.style.display = "none";
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    var userInterests = document.getElementById("interestsList");
+    var interestsContainer = document.getElementById("interestsContainer");
+    var noInterestsMessage = document.getElementById("noInterestsMessage");
+
+    // Verifica se há interesses para mostrar
+    if (userInterests && userInterests.childElementCount > 0) {
+        interestsContainer.style.display = "block"; // Mostra o container dos interesses
+        if (noInterestsMessage) noInterestsMessage.style.display = "none";  // Oculta a mensagem de "No interests selected"
+    } else {
+        interestsContainer.style.display = "none";  // Oculta o container dos interesses
+        if (noInterestsMessage) noInterestsMessage.style.display = "block"; // Mostra a mensagem de "No interests selected"
+    }
+});
 
 // Initial check on page load
 document.addEventListener('DOMContentLoaded', toggleChatPanel);
