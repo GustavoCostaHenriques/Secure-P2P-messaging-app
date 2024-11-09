@@ -285,6 +285,8 @@ public class PeerController {
         Peer peer = peerMap.get(peerId);
 
         List<String> topics = topicsMap.get("topics");
+        if (topics.size() == 0)
+            topics = null;
         if (peer != null) {
             peer.setInterests(topics);
         }

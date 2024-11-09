@@ -21,7 +21,7 @@
                 <p>Welcome, <strong th:if="${userId != null}" th:text="${userId}">!</strong></p>
                 <p>Port: <span th:if="${userPort != null}" th:text="${userPort}"></span></p>
                 <p>IP: <span th:if="${userIp != null}" th:text="${userIp}"></span></p>
-                <span id="noInterestsMessage" th:if="${userInterests == null || userInterests.isEmpty()}" th:text="'No interests selected.'" style="display:block">No interests selected.</span>
+                <span id="noInterestsMessage" th:if="${userInterests == null || userInterests.isEmpty()}" th:text="" style="display:block">No interests selected.</span>
                 <div id="interestsContainer" style="display: none;">
                     <button onclick="toggleInterestsList()" id="toggleInterestsButton">Show Interests</button>
                     <ul id="interestsList" class="scrollable-list" style="display: none;">

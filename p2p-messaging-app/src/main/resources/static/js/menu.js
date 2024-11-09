@@ -59,6 +59,44 @@ function saveChanges() {
         selectedTopics.push(checkbox.value);
     });
 
+    if (selectedTopics.length === 0) {
+        fetch('/saveChanges?peerId=' + peerId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ topics: [] })
+        })
+        .then(response => {
+            if (response.ok) {
+                const noInterestsMessage = document.getElementById('noInterestsMessage');
+                const interestsContainer = document.getElementById('interestsContainer');
+                const interestsList = document.getElementById('interestsList');
+                interestsList.innerHTML = ""; 
+    
+                if (selectedTopics.length > 0) {
+                    if (noInterestsMessage) noInterestsMessage.style.display = "none";
+                    interestsContainer.style.display = "block";
+                    selectedTopics.forEach(topic => {
+                        const li = document.createElement('li');
+                        li.textContent = topic;
+                        interestsList.appendChild(li);
+                    });
+                } else {
+                    if (noInterestsMessage) noInterestsMessage.style.display = "none";
+                    interestsContainer.style.display = "none";
+                }
+    
+                toggleDropdown_interests();
+                toggleDropdown();
+            } else {
+                console.error("Failed to update interests.");
+            }
+        })
+        .catch(error => console.error("Error:", error));
+        return;
+    }
+
     fetch('/saveChanges?peerId=' + peerId, {
         method: 'POST',
         headers: {
