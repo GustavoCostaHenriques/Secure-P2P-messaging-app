@@ -1,7 +1,7 @@
 package com.p2pmessagingapp;
 
 import java.util.Date;
-
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import java.math.BigInteger;
-
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.X509Certificate;
 import java.security.cert.CertificateException;
@@ -33,6 +33,13 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+
+import com.amazonaws.services.s3.model.AmazonS3Exception;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.services.s3.model.S3Object;
+
+import io.github.cdimascio.dotenv.Dotenv;
 
 import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 
@@ -227,12 +234,43 @@ public class Peer {
      */
     public void communicate(User receiver, String content) {
         createChatDir();
-        String filename = createChat(this.values[0], receiver.getId());
+        String filenameAux = createChat(this.values[0], receiver.getId());
 
         // Create a message and send it to the receiver
+        String filename = "chats/" + filenameAux;
         Message message = new Message(user, receiver, content, filename);
 
         try {
+            Dotenv dotenv = Dotenv.load();
+            String bucketName = dotenv.get("S3_BUCKET_NAME");
+
+            String objectKey = "CHATS/INDIVIDUAL/" + filenameAux;
+
+            // Attempt to get existing content if it exists
+            String existingContent = "";
+            try {
+                S3Object existingObject = S3Config.s3Client.getObject(bucketName, objectKey);
+                InputStream existingInputStream = existingObject.getObjectContent();
+                existingContent = new String(existingInputStream.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (AmazonS3Exception e) {
+                // If the object does not exist, set existingContent as an empty string
+                if (!e.getErrorCode().equals("NoSuchKey")) {
+                    throw e; // Rethrow any exception other than "NoSuchKey"
+                }
+            }
+
+            // Concatenate existing content with the new content
+            String updatedContent = existingContent + content + "\n";
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(
+                    updatedContent.getBytes(StandardCharsets.UTF_8));
+
+            long contentLength = inputStream.available();
+
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentLength(contentLength);
+
+            PutObjectRequest request = new PutObjectRequest(bucketName, objectKey, inputStream, metadata);
+            S3Config.s3Client.putObject(request);
             this.serverThread.sendMessage(message); // Send the message through the server thread
         } catch (Exception e) {
             e.printStackTrace();
@@ -502,8 +540,10 @@ public class Peer {
         try {
             // File path in the format "chats/user1-user2"
             String name = "chats/" + user1 + "-" + user2;
+            String nameAux = user1 + "-" + user2;
             // Alternative file path in the format "chats/user2-user1"
             String othername = "chats/" + user2 + "-" + user1;
+            String otherNameAux = user2 + "-" + user1;
 
             File chat = new File(name); // Create a reference to the first possible chat file
             File otherChat = new File(othername); // Create a reference to the second possible chat file
@@ -514,9 +554,9 @@ public class Peer {
 
             // Return the name of the file that exists
             if (chat.exists())
-                return name; // Return user1-user2 if it exists
+                return nameAux; // Return user1-user2 if it exists
             else if (otherChat.exists())
-                return othername; // Return user2-user1 if it exists
+                return otherNameAux; // Return user2-user1 if it exists
         } catch (Exception e) {
             e.printStackTrace();
         }
