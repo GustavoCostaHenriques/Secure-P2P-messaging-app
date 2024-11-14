@@ -34,10 +34,8 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
-import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3Object;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
@@ -241,36 +239,36 @@ public class Peer {
         Message message = new Message(user, receiver, content, filename);
 
         try {
-            Dotenv dotenv = Dotenv.load();
-            String bucketName = dotenv.get("S3_BUCKET_NAME");
+            // Generate a unique key for each message using the current timestamp
+            String objectKey = "CHATS/INDIVIDUAL/" + filenameAux + "_" + System.currentTimeMillis();
+            String awsbucket1 = Dotenv.load().get("S3_BUCKET_NAME_1");
+            String awsbucket2 = Dotenv.load().get("S3_BUCKET_NAME_2");
+            String awsbucket3 = Dotenv.load().get("S3_BUCKET_NAME_3");
+            String awsbucket4 = Dotenv.load().get("S3_BUCKET_NAME_4");
 
-            String objectKey = "CHATS/INDIVIDUAL/" + filenameAux;
-
-            // Attempt to get existing content if it exists
-            String existingContent = "";
-            try {
-                S3Object existingObject = S3Config.s3Client.getObject(bucketName, objectKey);
-                InputStream existingInputStream = existingObject.getObjectContent();
-                existingContent = new String(existingInputStream.readAllBytes(), StandardCharsets.UTF_8);
-            } catch (AmazonS3Exception e) {
-                // If the object does not exist, set existingContent as an empty string
-                if (!e.getErrorCode().equals("NoSuchKey")) {
-                    throw e; // Rethrow any exception other than "NoSuchKey"
-                }
-            }
-
-            // Concatenate existing content with the new content
-            String updatedContent = existingContent + content + "\n";
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(
-                    updatedContent.getBytes(StandardCharsets.UTF_8));
-
-            long contentLength = inputStream.available();
-
+            // Set metadata with the content length
             ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(contentLength);
+            metadata.setContentLength(content.length());
 
-            PutObjectRequest request = new PutObjectRequest(bucketName, objectKey, inputStream, metadata);
-            S3Config.s3Client.putObject(request);
+            // Convert the message content to a byte array (to allow multiple InputStream
+            // instances)
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+
+            // Upload the message as a new object in S3 for each bucket
+            S3Config.s3Client.putObject(
+                    new PutObjectRequest(awsbucket1, objectKey, new ByteArrayInputStream(contentBytes), metadata));
+            S3Config.s3Client.putObject(
+                    new PutObjectRequest(awsbucket2, objectKey, new ByteArrayInputStream(contentBytes), metadata));
+            S3Config.s3Client.putObject(
+                    new PutObjectRequest(awsbucket3, objectKey, new ByteArrayInputStream(contentBytes), metadata));
+            S3Config.s3Client.putObject(
+                    new PutObjectRequest(awsbucket4, objectKey, new ByteArrayInputStream(contentBytes), metadata));
+
+            // Now, also upload the message to Firebase Storage
+            FirebaseService firebaseService = new FirebaseService();
+            firebaseService.saveMessage(content, objectKey); // Using the same objectKey to identify the message in
+                                                             // Firebase
+
             this.serverThread.sendMessage(message); // Send the message through the server thread
         } catch (Exception e) {
             e.printStackTrace();
