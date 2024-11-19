@@ -9,6 +9,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.FileOutputStream;
 
+import java.security.Key;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -24,8 +25,11 @@ import javax.security.auth.x500.X500Principal;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Date;
+import java.util.HashMap;
 
+import javax.crypto.KeyGenerator;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -65,6 +69,16 @@ public class Server {
                                                                                               // server
     private static User userNull = new User("NULL", "NULL", 0000, null, null, null); // Placeholder user if peer not
                                                                                      // found
+    private static Map<String, Key> groupKeys = new HashMap<>(); // Map to store groups (interests) and their encryption
+                                                                 // keys
+    // List of interests (groups)
+    private static final String[] interests = {
+            "Technology", "Sports and Fitness", "Travel", "Music", "Movies and TV",
+            "Reading and Literature", "Health and Wellness", "Food and Cooking", "Nature and Sustainability",
+            "Art and Culture", "Science and Innovation", "History", "Animals and Pets", "Personal Development",
+            "Gaming and Entertainment", "Fashion and Style", "Politics and Society", "Photography",
+            "Spirituality and Meditation", "Education and Learning"
+    };
 
     // Define paths for keystore, truststore, and certificate files, and the
     // password
@@ -93,6 +107,9 @@ public class Server {
         addShutdownHook();
 
         try {
+            // Initialize groups and generate keys for each group
+            initializeGroups();
+
             // Initialize the KeyStore for the central server
             createCentralServerKeyStore(keyStoreFile, password);
 
@@ -132,6 +149,32 @@ public class Server {
                 e.printStackTrace();
             }
         }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------------------//
+    // --------------------------------------------------GROUP-CONVERSATIONS-SETUP--------------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
+    /**
+     * Initializes all groups based on the list of interests.
+     * For each group, a unique encryption key is generated.
+     */
+    private static void initializeGroups() throws NoSuchAlgorithmException {
+        for (String interest : interests) {
+            Key key = generateGroupKey(); // Generate a key for the group
+            groupKeys.put(interest, key); // Associate the group with the key
+        }
+    }
+
+    /**
+     * Generates an AES key for a group.
+     *
+     * @return The generated AES key.
+     */
+    private static Key generateGroupKey() throws NoSuchAlgorithmException {
+        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256); // Key size (128, 192, or 256 bits, depending on system support)
+        return keyGen.generateKey();
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -392,6 +435,7 @@ public class Server {
             // Check if it's a connection request with user IP and port specified but no
             // receiver ID
             if (user.getIp() != null && user.getPort() != 0000 && user.getReceiverId() == null) {
+                needsTosend = true;
                 userList.add(user); // Add user to the connected users list
                 String peerAlias = "peer-" + user.getId();
 
@@ -401,14 +445,44 @@ public class Server {
                 } catch (Exception e) {
                     e.printStackTrace(); // Log any issues during the TrustStore update
                 }
+
+                Map<String, Key> filteredGroupKeys = new HashMap<>();
+                if (user.getInterests() != null) {
+                    for (String interest : user.getInterests()) {
+                        if (groupKeys.containsKey(interest)) {
+                            filteredGroupKeys.put(interest, groupKeys.get(interest));
+                        }
+                    }
+                }
+
+                message = new Message(serverUser, user, null);
+                message.setGroupKeys(filteredGroupKeys);
             }
             // Check if it's a request to locate another user by ID (receiver ID specified,
             // no IP or port)
             else if (user.getIp() == null && user.getPort() == 0000 && user.getReceiverId() != null) {
                 needsTosend = true; // Flag as needing to send a response message
                 User foundUser = findUserById(user.getReceiverId()); // Look up the requested user in userList
-                message = new Message(serverUser, foundUser, null, null); // Prepare a response message to send to the
-                                                                          // user
+                message = new Message(serverUser, foundUser, null); // Prepare a response message to send to the
+                                                                    // user
+            }
+            // Check if it's a request to get keys for the user interests (receiver ID and
+            // IP specified,
+            // no port or receiver)
+            else if (user.getIp() != null && user.getPort() == 0000 && user.getReceiverId() == null) {
+                needsTosend = true; // Flag as needing to send a response message
+
+                Map<String, Key> filteredGroupKeys = new HashMap<>();
+                if (user.getInterests() != null) {
+                    for (String interest : user.getInterests()) {
+                        if (groupKeys.containsKey(interest)) {
+                            filteredGroupKeys.put(interest, groupKeys.get(interest));
+                        }
+                    }
+                }
+
+                message = new Message(serverUser, null, null); // Prepare a response message to send to the user
+                message.setGroupKeys(filteredGroupKeys);
             }
             // If IP, port, and receiver ID are all null, treat it as a user disconnect
             // request

@@ -1,8 +1,9 @@
 package com.p2pmessagingapp;
 
 import java.io.Serializable;
-
+import java.security.Key;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * The Message class represents a message being sent between users in the P2P
@@ -18,8 +19,8 @@ public class Message implements Serializable {
     private final User sender; // The user who is sending the message
     private final User receiver; // The user who is receiving the message
     private final String content; // The content of the message
-    private final String fileName; // The name of the file that is going to store the message information
     private final String time; // The time when the message was sent
+    private Map<String, Key> groupKeys;
 
     /**
      * Constructs a Message instance with a sender, receiver, and content.
@@ -28,17 +29,16 @@ public class Message implements Serializable {
      * @param receiver The user receiving the message.
      * @param content  The content of the message.
      */
-    public Message(User sender, User receiver, String content, String fileName) {
+    public Message(User sender, User receiver, String content) {
         LocalDateTime timeStap = LocalDateTime.now();
         this.sender = sender;
         this.receiver = receiver;
         this.content = content;
-        this.fileName = fileName;
         this.time = timeStap.toString();
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
-    // ----------------------------------------------------------GETTERS------------------------------------------------------------//
+    // ----------------------------------------------------GETTERS-AND-SETTERS------------------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
 
     /**
@@ -69,20 +69,29 @@ public class Message implements Serializable {
     }
 
     /**
-     * Gets filename
-     * 
-     * @return filename
-     */
-    public String getFileName() {
-        return fileName;
-    }
-
-    /**
      * Gets time
      * 
      * @return time
      */
     public String getTime() {
         return time;
+    }
+
+    /**
+     * Gets group keys
+     * 
+     * @return groupKeys
+     */
+    public Map<String, Key> getGroupKeys() {
+        return groupKeys;
+    }
+
+    /**
+     * Sets the group keys to the argument given
+     * 
+     * @param groupKeys group keys to store
+     */
+    public void setGroupKeys(Map<String, Key> groupKeys) {
+        this.groupKeys = groupKeys;
     }
 }

@@ -70,14 +70,23 @@
         <!-- Conversations list on the left -->
         <div class="conversations-panel">
             <div class="conversations-header">
-                <span>Chats</span>
+                <span id="chatsTab" class="tab active" onclick="showChats()">Chats</span>
+                <span id="groupsTab" class="tab" onclick="showGroups()">Groups</span>
                 <img src="/images/add_contact.png" class="add-contact-icon" id="addContactIcon" onclick="toggleAddContactDropdown()">
             </div>
-            <ul class="conversation-list">
+            <ul id="chatsList" class="conversation-list">
                 <li th:each="contact : ${contacts}"> 
                     <div class="conversation-container" th:data-contact="${contact}" onclick="selectConversation(this)">
                         <img src="/images/user.png">
                         <span th:text="${contact}"></span>
+                    </div>
+                </li>
+            </ul>
+            <ul id="groupsList" class="conversation-list" style="display: none;">
+                <li th:each="group : ${userInterests}">
+                    <div class="conversation-container" th:data-group="${group}" onclick="selectGroupConversation(this)">
+                        <img src="/images/group.png">
+                        <span th:text="${group}"></span>
                     </div>
                 </li>
             </ul>

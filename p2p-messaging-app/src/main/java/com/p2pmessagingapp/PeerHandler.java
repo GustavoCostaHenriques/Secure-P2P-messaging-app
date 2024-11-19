@@ -1,12 +1,8 @@
 package com.p2pmessagingapp;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
-
-import java.util.Scanner;
 
 import javax.net.ssl.SSLSocket;
 
@@ -55,49 +51,19 @@ public class PeerHandler extends Thread {
             while (true) {
                 // Block until an object is available to be read
                 Message message = (Message) objectInputStream.readObject();
-                if (message.getSender().getId().equals("SERVER"))
-                    peerServer.setUserSearched(message.getReceiver());
-                else {
-                    writeOnChat(
-                            message.getTime() + "-" + "[" + message.getSender().getId() + "] " + message.getContent(),
-                            message.getFileName());
+                if (message.getSender().getId().equals("SERVER")) {
+                    if (message.getGroupKeys() != null)
+                        peerServer.setGroupKeysToPeer(message.getGroupKeys());
+                    else
+                        peerServer.setUserSearched(message.getReceiver());
+                } else {
+                    peerServer.addMessageToPeer(message);
                 }
                 break; // Exit after reading the first message (consider removing this break for
                        // continuous listening)
             }
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace(); // Log the error to see what went wrong
-        }
-    }
-
-    /**
-     * Writes a message to a specified chat file.
-     *
-     * @param message  The message to be written to the chat.
-     * @param fileName The name of the chat file where the message will be appended.
-     */
-    private void writeOnChat(String message, String fileName) {
-        try {
-            BufferedWriter fileWriter;
-
-            // Using a Scanner to read through the file for any existing content (not
-            // necessary for writing)
-            try (Scanner sc = new Scanner(fileName)) {
-                // Initialize BufferedWriter in append mode
-                fileWriter = new BufferedWriter(new FileWriter(fileName, true)); // append mode
-
-                // Read through existing lines (this part is redundant for writing)
-                while (sc.hasNextLine()) {
-                    sc.nextLine();
-                }
-            }
-
-            // Write the new message to the file followed by a newline
-            fileWriter.write(message);
-            fileWriter.write(System.getProperty("line.separator"));
-            fileWriter.close(); // Close the writer to release system resources
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 }

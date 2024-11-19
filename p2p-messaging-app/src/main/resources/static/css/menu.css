@@ -292,14 +292,29 @@ body {
 
 .conversations-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start; 
     align-items: center;
-    padding: 15px;
+    padding: 10px; 
     background-color: #e8e8e8;
-    font-size: 1.5em;
+    font-size: 1.2em; 
     font-weight: bold;
     color: #333;
     border-bottom: 1px solid #ddd;
+}
+
+.tab {
+    cursor: pointer;
+    padding: 5px 10px; 
+    margin-right: 5px; 
+    border-bottom: 2px solid transparent;
+    font-size: 1em; 
+    text-align: center; 
+}
+
+.tab.active {
+    font-weight: bold;
+    color: #1e90ff;
+    border-bottom: 2px solid #1e90ff;
 }
 
 .conversation-list {
@@ -308,6 +323,11 @@ body {
     margin: 0;
     overflow-y: auto;
     flex-grow: 1;
+    display: none; /* Chats or Groups will be toggled */
+}
+
+.conversation-list.active {
+    display: block;
 }
 
 .conversation-list li {

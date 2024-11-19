@@ -1,6 +1,5 @@
 package com.p2pmessagingapp;
 
-import java.util.Date;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,17 +10,28 @@ import java.io.ObjectOutputStream;
 import java.io.FileOutputStream;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 import java.util.ArrayList;
-
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
 import java.math.BigInteger;
+
 import java.nio.charset.StandardCharsets;
-import java.security.*;
-import java.security.cert.X509Certificate;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.*;
+import java.security.cert.X509Certificate;
 
 import javax.security.auth.x500.X500Principal;
-
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -36,6 +46,8 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+
+import com.codahale.shamir.Scheme;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
@@ -52,6 +64,8 @@ public class Peer {
     private SSLSocket sslServerSocket; // SSL server socket for communication with server
     private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
     private List<String> interests = new ArrayList<>(); // List of interests
+    private final List<Message> messageHistory = new CopyOnWriteArrayList<>(); // List to store all messages for this
+                                                                               // peer
     private PeerServer serverThread; // Thread for the peer server
     private boolean verificationStatus = true; // Boolean that checks the values of this peer
     private boolean repeatedId = false; // Boolean that checks the values of this peer
@@ -59,8 +73,11 @@ public class Peer {
     private User user; // User that will be created for this peer
     private final String serverIp = "localhost"; // IP of the server that has information about other peers
     private final int serverPort = 2222; // Port of the server that has information about other peers
+    private boolean firstMessageSent = true; // Bool that checks if it's the first message that this peer is sending
+    private SecretKey aesKey; // Secret Key of the peer to encrypt messages to store in the cloud
     private volatile User userFound; // Using 'volatile' on serverResponse to ensure visibility across threads and
                                      // prevent infinite loop due to caching issues
+    private Map<String, Key> groupKeys = new HashMap<>();
     // Variables that will store the paths for the keystore, truststore and server
     // certificate
     private String keyStoreFile;
@@ -114,7 +131,7 @@ public class Peer {
         addPeerCertificateToTrustStore(user, trustStoreFile, password);
 
         // Initialize the PeerServer instance on specified port
-        serverThread = new PeerServer(Integer.parseInt(this.values[1]), keyStoreFile, trustStoreFile, password);
+        serverThread = new PeerServer(Integer.parseInt(this.values[1]), keyStoreFile, trustStoreFile, password, this);
 
         // Check if the server was successfully created; if not, mark port as repeated
         if (!serverThread.getServerCreated()) {
@@ -181,7 +198,7 @@ public class Peer {
         // Initialize the PeerServer on the specified port for incoming connections
         // (this serves to update the socket with the new certificates on the
         // peerServer side)
-        serverThread = new PeerServer(Integer.parseInt(this.values[1]), keyStoreFile, trustStoreFile, password);
+        serverThread = new PeerServer(Integer.parseInt(this.values[1]), keyStoreFile, trustStoreFile, password, this);
     }
 
     /**
@@ -231,45 +248,22 @@ public class Peer {
      * @param content  The content of the message that is going to be sent.
      */
     public void communicate(User receiver, String content) {
-        createChatDir();
-        String filenameAux = createChat(this.values[0], receiver.getId());
 
         // Create a message and send it to the receiver
-        String filename = "chats/" + filenameAux;
-        Message message = new Message(user, receiver, content, filename);
+        Message message = new Message(user, receiver, content);
 
         try {
-            // Generate a unique key for each message using the current timestamp
-            String objectKey = "CHATS/INDIVIDUAL/" + filenameAux + "_" + System.currentTimeMillis();
-            String awsbucket1 = Dotenv.load().get("S3_BUCKET_NAME_1");
-            String awsbucket2 = Dotenv.load().get("S3_BUCKET_NAME_2");
-            String awsbucket3 = Dotenv.load().get("S3_BUCKET_NAME_3");
-            String awsbucket4 = Dotenv.load().get("S3_BUCKET_NAME_4");
-
-            // Set metadata with the content length
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentLength(content.length());
-
-            // Convert the message content to a byte array (to allow multiple InputStream
-            // instances)
-            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
-
-            // Upload the message as a new object in S3 for each bucket
-            S3Config.s3Client.putObject(
-                    new PutObjectRequest(awsbucket1, objectKey, new ByteArrayInputStream(contentBytes), metadata));
-            S3Config.s3Client.putObject(
-                    new PutObjectRequest(awsbucket2, objectKey, new ByteArrayInputStream(contentBytes), metadata));
-            S3Config.s3Client.putObject(
-                    new PutObjectRequest(awsbucket3, objectKey, new ByteArrayInputStream(contentBytes), metadata));
-            S3Config.s3Client.putObject(
-                    new PutObjectRequest(awsbucket4, objectKey, new ByteArrayInputStream(contentBytes), metadata));
-
-            // Now, also upload the message to Firebase Storage
-            FirebaseService firebaseService = new FirebaseService();
-            firebaseService.saveMessage(content, objectKey); // Using the same objectKey to identify the message in
-                                                             // Firebase
 
             this.serverThread.sendMessage(message); // Send the message through the server thread
+            // Add to the message history
+            addMessageToHistory(message);
+
+            LocalDateTime timeStap = LocalDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("ddMMyy-HH:mm");
+            String formattedTimestamp = timeStap.format(formatter);
+            String objectKey = "CHATS/" + user.getId() + "/" + receiver.getId() + "_" + formattedTimestamp;
+
+            this.sendMessageToCloud(objectKey, content);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -506,59 +500,124 @@ public class Peer {
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
-    // ----------------------------------------------CHAT-DIRECTORY-MANAGEMENT-METHODS----------------------------------------------//
+    // ------------------------------------------------CLOUD-STORAGE-UNITS-MANAGEMENT-----------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
 
-    /**
-     * Utility method to create the "chats" directory if it doesn't already exist.
-     * This directory is used to store chat history files.
-     */
-    private static void createChatDir() {
+    private void sendMessageToCloud(String objectKey, String content) {
+
         try {
-            File dir = new File("chats"); // Create a reference to the "chats" directory
-            if (!dir.exists()) // Check if the directory doesn't exist
-                dir.mkdir(); // Create the directory
+
+            if (firstMessageSent) {
+                KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+                keyGen.init(256); // Usa 128, 192, ou 256 bits, dependendo do suporte
+                aesKey = keyGen.generateKey();
+            }
+
+            // Encrypt the message using AES
+            Cipher cipher = Cipher.getInstance("AES");
+            cipher.init(Cipher.ENCRYPT_MODE, aesKey);
+            byte[] encryptedContent = cipher.doFinal(content.getBytes(StandardCharsets.UTF_8));
+
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentLength(encryptedContent.length);
+
+            // Upload the encrypted content to each cloud provider (AWS, Firebase, Azure)
+            uploadToCloud(encryptedContent, objectKey, metadata);
+
+            if (firstMessageSent) {
+                // Store key shares across different storage providers
+                // Split the AES key using Shamir's Secret Sharing
+                Scheme scheme = new Scheme(new SecureRandom(), 12, 8); // 12 parts, minimum of 8 to reconstruct
+                Map<Integer, byte[]> keyShares = scheme.split(aesKey.getEncoded());
+
+                storeKeyShares(keyShares, metadata);
+            }
+            firstMessageSent = false;
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * Creates a new chat file between two users, if it doesn't already exist.
-     * Checks both possible name combinations for the chat file (user1-user2 and
-     * user2-user1), ensuring that only one file is created for a conversation
-     * between two users.
-     *
-     * @param user1 The first user's ID.
-     * @param user2 The second user's ID.
-     * @return The name of the chat file that exists or was created, or null if an
-     *         error occurred.
-     */
-    private static String createChat(String user1, String user2) {
-        try {
-            // File path in the format "chats/user1-user2"
-            String name = "chats/" + user1 + "-" + user2;
-            String nameAux = user1 + "-" + user2;
-            // Alternative file path in the format "chats/user2-user1"
-            String othername = "chats/" + user2 + "-" + user1;
-            String otherNameAux = user2 + "-" + user1;
+    private void uploadToCloud(byte[] encryptedContent, String objectKey,
+            ObjectMetadata metadata) {
 
-            File chat = new File(name); // Create a reference to the first possible chat file
-            File otherChat = new File(othername); // Create a reference to the second possible chat file
+        // Define AWS buckets
+        String[] awsBuckets = {
+                Dotenv.load().get("S3_BUCKET_NAME_1"),
+                Dotenv.load().get("S3_BUCKET_NAME_2"),
+                Dotenv.load().get("S3_BUCKET_NAME_3"),
+                Dotenv.load().get("S3_BUCKET_NAME_4")
+        };
 
-            // If neither chat file exists, create the first one
-            if (!chat.exists() && !otherChat.exists())
-                chat.createNewFile(); // Create the chat file with name user1-user2
-
-            // Return the name of the file that exists
-            if (chat.exists())
-                return nameAux; // Return user1-user2 if it exists
-            else if (otherChat.exists())
-                return otherNameAux; // Return user2-user1 if it exists
-        } catch (Exception e) {
-            e.printStackTrace();
+        // Upload to AWS
+        for (String awsBucket : awsBuckets) {
+            S3Config.s3Client.putObject(
+                    new PutObjectRequest(awsBucket, objectKey, new ByteArrayInputStream(encryptedContent), metadata));
         }
-        return null; // Return null if no chat file could be created or found
+
+        // Upload to Firebase
+        FirebaseService firebaseService = new FirebaseService();
+        String[] fbContainers = { "bucket_chats1", "bucket_chats2", "bucket_chats3", "bucket_chats4" };
+        for (String fbContainer : fbContainers) {
+            firebaseService.saveMessage(fbContainer, objectKey, Base64.getEncoder().encodeToString(encryptedContent));
+        }
+
+        // Upload to Azure
+        AzureBlobService azureBlobService = new AzureBlobService();
+        String[] azureContainers = { "bucket-chats1", "bucket-chats2", "bucket-chats3", "bucket-chats4" };
+        for (String container : azureContainers) {
+            azureBlobService.uploadMessage(container, objectKey, new ByteArrayInputStream(encryptedContent));
+        }
+    }
+
+    private void storeKeyShares(Map<Integer, byte[]> keyShares, ObjectMetadata metadata) {
+        int count = 0;
+
+        // Store key shares in AWS
+        for (Map.Entry<Integer, byte[]> share : keyShares.entrySet()) {
+            if (count < 4) {
+                String awsBucket = Dotenv.load().get("S3_BUCKET_NAME_" + (count + 1));
+                S3Config.s3Client.putObject(new PutObjectRequest(awsBucket, "KEYS/" + this.values[0],
+                        new ByteArrayInputStream(share.getValue()), metadata));
+            }
+            count++;
+            if (count >= 12)
+                break;
+        }
+
+        // Define the buckets for Firebase
+        String[] fbBuckets = { "bucket_chats1", "bucket_chats2", "bucket_chats3", "bucket_chats4" };
+
+        // Initialize the FirebaseService
+        FirebaseService firebaseService = new FirebaseService();
+
+        // Create a new Map to hold only the selected keyShares (5th to 8th part)
+        Map<Integer, byte[]> firebaseKeyShares = new HashMap<>();
+
+        count = 0;
+        for (Map.Entry<Integer, byte[]> share : keyShares.entrySet()) {
+            if (count >= 4 && count < 8) {
+                firebaseKeyShares.put(count, share.getValue());
+            }
+            count++;
+            if (count >= 12)
+                break;
+        }
+
+        // Use the saveKeyParts function to store the selected parts across buckets
+        firebaseService.saveKeyParts(fbBuckets, user.getId(), firebaseKeyShares);
+
+        // Store key shares in Azure
+        AzureBlobService azureBlobService = new AzureBlobService();
+        count = 0;
+        for (Map.Entry<Integer, byte[]> share : keyShares.entrySet()) {
+            if (count >= 8 && count < 12) {
+                String azureContainer = "bucket-chats" + (count - 7);
+                azureBlobService.uploadMessage(azureContainer, "KEYS/" + this.values[0],
+                        new ByteArrayInputStream(share.getValue()));
+            }
+            count++;
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -572,77 +631,11 @@ public class Peer {
      * @throws IOException If an I/O error occurs during the killing operations.
      */
     public void killClient(Peer peer) throws IOException {
-        deleteMessageFile(peer);
         User user = new User(peer.values[0], null, 0000, null, null, null);
         sendMessageToServer(user);
         peer.serverThread.closeServerSocket(); // Closes server socket
         deleteSecureFiles(peer);
-    }
-
-    /**
-     * Deletes all the necessary message files. It checks if the corresponding peer
-     * (user) is offline and, if so, deletes the message files related to that peer.
-     * After processing all files, if the "chats" directory is empty, it deletes the
-     * directory.
-     * 
-     * @param peer The peer instance used to get the global values (e.g., the
-     *             current user's name).
-     */
-    private static void deleteMessageFile(Peer peer) {
-        // Define the "chats" folder where message files are stored
-        File chatsFolder = new File("chats");
-
-        // Array to hold the list of files in the "chats" directory
-        File[] chatsFiles;
-
-        // Check if the "chats" directory exists and is a directory
-        if (chatsFolder.exists() && chatsFolder.isDirectory()) {
-            // Get the list of files inside the "chats" directory
-            chatsFiles = chatsFolder.listFiles();
-
-            // If the directory contains files (non-null), process them
-            if (chatsFiles != null) {
-                // Loop through each file in the "chats" directory
-                for (File chatsFile : chatsFiles) {
-                    // Ensure that the current item is a file and not a subdirectory
-                    if (chatsFile.isFile()) {
-                        // Extract the names of the users involved in the chat from the filename
-                        String[] usersNames = chatsFile.getName().split("-");
-                        String otherUser = null;
-
-                        // Determine which user is the other participant in the chat
-                        if (peer.values[0].equals(usersNames[0]))
-                            otherUser = usersNames[1]; // If the current peer is the first user, set the other user
-                        else if (peer.values[0].equals(usersNames[1]))
-                            otherUser = usersNames[0]; // If the current peer is the second user, set the other user
-
-                        // Flag to check if the other user (client) is online
-                        User clientIsOnline = null;
-
-                        try {
-                            clientIsOnline = peer.checkscommunication(otherUser);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                        while (clientIsOnline == null) {
-                            try {
-                                Thread.sleep(1000); // Waits for 1 second (1000 milliseconds)
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-
-                        if (clientIsOnline.getId().equals("NULL"))
-                            chatsFile.delete(); // Delete the chat file for the offline user
-                    }
-                }
-            }
-        }
-
-        // After processing all files, check if the "chats" directory is now empty
-        chatsFiles = chatsFolder.listFiles(); // Refresh the file list after deletions
-        if (chatsFiles != null && chatsFiles.length == 0)
-            chatsFolder.delete(); // Delete the "chats" directory if no files remain
+        clearMessageHistory();
     }
 
     /**
@@ -673,8 +666,11 @@ public class Peer {
     private static void addShutdownHook(Peer peer) {
         // Register a new thread to be executed on program shutdown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            deleteMessageFile(peer);
-            deleteSecureFiles(peer);
+            try {
+                peer.killClient(peer);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }));
     }
 
@@ -747,15 +743,27 @@ public class Peer {
         return byteArrayOutputStream.toByteArray(); // Return the byte array
     }
 
-    /**
-     * Changes the interests of a User.
-     *
-     * @param interests The interests updated to change.
-     */
-    public void setInterests(List<String> interests) {
-        user.setInterests(interests);
+    // -----------------------------------------------------------------------------------------------------------------------------//
+    // ----------------------------------------------------MESSAGES-MANAGEMENT------------------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
+    public List<Message> getMessageHistory() {
+        return new ArrayList<>(messageHistory); // Returns a copy to prevent external modifications
     }
 
+    public void clearMessageHistory() {
+        messageHistory.clear();
+    }
+
+    public void addMessageToHistory(Message message) {
+        messageHistory.add(message);
+    }
+
+    public List<Message> getMessagesByUser(String userId) {
+        return messageHistory.stream()
+                .filter(msg -> msg.getSender().getId().equals(userId) || msg.getReceiver().getId().equals(userId))
+                .collect(Collectors.toList());
+    }
     // -----------------------------------------------------------------------------------------------------------------------------//
     // ----------------------------------------------------GETTERS-AND-SETTERS------------------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -776,6 +784,19 @@ public class Peer {
      */
     public List<String> getInterests() {
         return interests;
+    }
+
+    /**
+     * Changes the interests of a User.
+     *
+     * @param interests The interests updated to change.
+     */
+    public void setInterests(List<String> interests) {
+        user.setInterests(interests);
+        this.interests = interests;
+        User userToSend = new User(this.user.getId(), this.user.getIp(), 0000, null, this.user.getCertificate(),
+                this.user.getInterests());
+        sendMessageToServer(userToSend);
     }
 
     /**
@@ -826,4 +847,13 @@ public class Peer {
         peer.repeatedPort = bool;
     }
 
+    /**
+     * Sets the GroupKeys of the peer.
+     */
+    public void setGroupKeys(Peer peer, Map<String, Key> groupKeys) {
+        peer.groupKeys = groupKeys;
+        for (Map.Entry<String, Key> entry : groupKeys.entrySet()) {
+            System.out.println("Interest: " + entry.getKey() + " | Key: " + entry.getValue());
+        }
+    }
 }

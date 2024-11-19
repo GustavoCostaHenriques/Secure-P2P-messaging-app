@@ -1,9 +1,6 @@
 package com.p2pmessagingapp;
 
 import java.io.IOException;
-import java.io.File;
-import java.io.BufferedReader;
-import java.io.FileReader;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -139,21 +136,21 @@ public class PeerController {
         model.addAttribute("userInterests", userInterests);
 
         // Load all previous chats with contacts and add them to the model
-        File chatDir = new File("chats");
         List<String> contacts = new ArrayList<>();
+        List<Message> peerMessages = peer.getMessageHistory();
 
-        if (chatDir.exists() && chatDir.isDirectory()) {
-            // Check all files in the chat directory for chat history
-            for (File file : chatDir.listFiles()) {
-                String fileName = file.getName();
-                if (fileName.contains("-")) {
-                    String[] users = fileName.split("-");
-                    if (users.length == 2) {
-                        if (users[0].equals(userId))
-                            contacts.add(users[1]);
-                        else if (users[1].equals(userId))
-                            contacts.add(users[0]);
-                    }
+        for (Message message : peerMessages) {
+            if (message.getSender().getId().equals(peerId)) {
+                String userConnection = message.getReceiver().getId();
+                // Check if the ID is already in the list before adding
+                if (!contacts.contains(userConnection)) {
+                    contacts.add(userConnection);
+                }
+            } else if (message.getReceiver().getId().equals(peerId)) {
+                String userConnection = message.getSender().getId();
+                // Check if the ID is already in the list before adding
+                if (!contacts.contains(userConnection)) {
+                    contacts.add(userConnection);
                 }
             }
         }
@@ -212,27 +209,19 @@ public class PeerController {
     @ResponseBody
     public List<String> loadChat(@RequestParam("peerId") String peerId,
             @RequestParam("contactName") String contactName) {
-        List<String> messages = new ArrayList<>();
-        String fileName = "chats/" + peerId + "-" + contactName;
+        Peer peer = peerMap.get(peerId);
+        List<String> messagesToString = new ArrayList<>();
+        if (peer != null) {
+            List<Message> messages = peer.getMessagesByUser(contactName);
 
-        // Check if chat file exists with either "peerId-contactName" or
-        // "contactName-peerId" format
-        File chatFile = new File(fileName);
-        if (!chatFile.exists())
-            chatFile = new File("chats/" + contactName + "-" + peerId);
-
-        // Read the chat file line-by-line if it exists
-        if (chatFile.exists()) {
-            try (BufferedReader reader = new BufferedReader(new FileReader(chatFile))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    messages.add(line); // Add each message line to the list
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+            for (Message message : messages) {
+                String messageToString = message.getTime() + "-" + "[" + message.getSender().getId() + "] "
+                        + message.getContent();
+                messagesToString.add(messageToString);
             }
         }
-        return messages; // Return the list of messages
+
+        return messagesToString; // Return the list of messages
     }
 
     /**

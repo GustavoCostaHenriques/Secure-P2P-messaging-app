@@ -83,6 +83,21 @@
         <artifactId>dotenv-java</artifactId>
         <version>2.2.0</version>
     </dependency>
+    <dependency>
+        <groupId>com.google.firebase</groupId>
+        <artifactId>firebase-admin</artifactId>
+        <version>9.1.1</version>
+    </dependency>
+    <dependency>
+        <groupId>com.azure</groupId>
+        <artifactId>azure-storage-blob</artifactId>
+        <version>12.29.0</version>
+    </dependency>
+    <dependency>
+        <groupId>com.codahale</groupId>
+        <artifactId>shamir</artifactId>
+        <version>0.7.0</version>
+    </dependency>
   </dependencies>
 
   <build>

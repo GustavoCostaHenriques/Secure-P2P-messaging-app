@@ -8,12 +8,15 @@ import java.io.ObjectOutputStream;
 
 import java.net.SocketException;
 
+import java.security.Key;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+
+import java.util.Map;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -42,7 +45,8 @@ public final class PeerServer extends Thread {
      *                connections.
      * @throws IOException If an error occurs while creating the server socket.
      */
-    public PeerServer(int port, String keyStoreFile, String trustStoreFile, String password) {
+    public PeerServer(int port, String keyStoreFile, String trustStoreFile, String password, Peer peer) {
+        this.peer = peer;
         createSSLServerSocket(port, keyStoreFile, trustStoreFile, password);
     }
 
@@ -140,14 +144,22 @@ public final class PeerServer extends Thread {
      * @throws Exception If an error occurs during the sending process.
      */
     public void sendMessage(Message message) throws Exception {
-        peer = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
+        Peer peerInstance = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
                 message.getReceiver().getPort(), message.getReceiver().getInterests(), message.getSender()); // Create a
                                                                                                              // Peer
                                                                                                              // instance
                                                                                                              // for the
                                                                                                              // receiver
         byte[] serializedMessage = serializeMessage(message); // Serialize the message
-        peer.sendMessage(serializedMessage); // Send the serialized message to the peer
+        peerInstance.sendMessage(serializedMessage); // Send the serialized message to the peer
+    }
+
+    public void addMessageToPeer(Message message) {
+        peer.addMessageToHistory(message);
+    }
+
+    public void setGroupKeysToPeer(Map<String, Key> groupKeys) {
+        peer.setGroupKeys(peer, groupKeys);
     }
 
     /**

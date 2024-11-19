@@ -89,6 +89,7 @@ function saveChanges() {
     
                 toggleDropdown_interests();
                 toggleDropdown();
+                window.location.href = `/menu?peerId=${peerId}`
             } else {
                 console.error("Failed to update interests.");
             }
@@ -126,6 +127,7 @@ function saveChanges() {
 
             toggleDropdown_interests();
             toggleDropdown();
+            window.location.href = `/menu?peerId=${peerId}`
         } else {
             console.error("Failed to update interests.");
         }
@@ -134,6 +136,7 @@ function saveChanges() {
 }
 
 function logout() {
+    clearUserConversations();
     // Get the peerId from the current URL
     var urlParams = new URLSearchParams(window.location.search);
     var peerId = urlParams.get('peerId');
@@ -169,6 +172,7 @@ function startChat() {
         if (result === 'exists') {
             addConversation(contactName);
             addContactDropdown.style.display = 'none';
+            showChats();
         } else if (result === 'not found') {
             document.getElementById('errorMessage1').style.display = 'none';
             document.getElementById('errorMessage').style.display = 'block';
@@ -199,15 +203,25 @@ function addConversation(contactName) {
         };
 
         conversationList.appendChild(newConversation);
+        updateStoredConversations(contactName);
+
+        conversationList.style.display = 'none'; 
+        conversationList.offsetHeight; 
+        conversationList.style.display = 'block'; 
 
         selectConversation(newConversation);
+    } else {
+        selectConversation(exists);
     }
-    selectConversation(exists);
+    
     document.getElementById('errorMessage').style.display = 'none'; 
     document.getElementById('addContactDropdown').style.display = 'none'; 
 }
 
 function selectConversation(element) {
+    if (!element) {
+        return;
+    }
     document.querySelectorAll('.conversation-container').forEach(conversation => {
         conversation.classList.remove('active');
     });
@@ -228,6 +242,27 @@ function selectConversation(element) {
     startPollingForMessages(peerId, contactName);
 }
 
+function selectGroupConversation(element) {
+    document.querySelectorAll('.conversation-container').forEach(conversation => {
+        conversation.classList.remove('active');
+    });
+
+    element.classList.add('active');
+    const group = element.getAttribute("data-group");
+
+    // Get peerId and contactName
+    var urlParams = new URLSearchParams(window.location.search);
+    var peerId = urlParams.get('peerId');;
+    var groupName = element.getAttribute("data-group");
+
+    toggleChatPanel();
+
+    // Load chat messages
+    loadGroupMessages(peerId, groupName);
+
+    startPollingForGroupMessages(peerId, groupName);
+}
+
 function toggleChatPanel() {
     const chatPanel = document.getElementById('chatPanel');
     const chatActivePanel = document.getElementById('chatActivePanel');
@@ -241,6 +276,9 @@ function toggleChatPanel() {
         chatPanel.style.display = 'flex';
         chatActivePanel.style.display = 'none';
     }
+}
+
+function loadGroupMessages(peerId, contactName) {
 }
 
 
@@ -327,6 +365,12 @@ function startPollingForMessages(peerId, contactName) {
     }, 5000); 
 }
 
+function startPollingForGroupMessages(peerId, contactName) {
+    setInterval(() => {
+        loadGroupMessages(peerId, contactName);
+    }, 5000); 
+}
+
 function toggleDropdown_interests() {
     var dropdownMenu = document.getElementById("dropdown_interests-menu");
     if (dropdownMenu.style.display === "none" || dropdownMenu.style.display === "") {
@@ -335,6 +379,83 @@ function toggleDropdown_interests() {
         dropdownMenu.style.display = "none";
     }
 }
+
+function saveActiveTab(tabName) {
+    localStorage.setItem('activeTab', tabName);
+}
+
+// Função para restaurar o tab ativo com base no localStorage
+function restoreActiveTab() {
+    const activeTab = localStorage.getItem('activeTab') || 'chats'; // Default para 'chats' se não existir
+    if (activeTab === 'groups') {
+        showGroups(); // Ativa o tab 'Groups'
+    } else {
+        showChats(); // Ativa o tab 'Chats'
+    }
+}
+
+function showChats() {
+    document.getElementById('chatsTab').classList.add('active');
+    document.getElementById('groupsTab').classList.remove('active');
+    document.getElementById('chatsList').style.display = 'block';
+    document.getElementById('groupsList').style.display = 'none';
+
+    saveActiveTab('chats');
+}
+
+function showGroups() {
+    document.getElementById('groupsTab').classList.add('active');
+    document.getElementById('chatsTab').classList.remove('active');
+    document.getElementById('chatsList').style.display = 'none';
+    document.getElementById('groupsList').style.display = 'block';
+
+    saveActiveTab('groups');
+}
+
+function getLocalStorageKey() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var peerId = urlParams.get('peerId');
+    return `conversations_${peerId}`;
+}
+
+function updateStoredConversations(contactName) {
+    const storageKey = getLocalStorageKey();
+    const storedConversations = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+    // Adiciona a conversa apenas se ainda não existir
+    if (!storedConversations.includes(contactName)) {
+        storedConversations.push(contactName);
+        localStorage.setItem(storageKey, JSON.stringify(storedConversations));
+    }
+}
+
+function restoreConversations() {
+    const storageKey = getLocalStorageKey();
+    const storedConversations = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const conversationList = document.querySelector('.conversation-list');
+
+    // Limpa a lista de conversas existentes no DOM
+    conversationList.innerHTML = '';
+
+    // Recria cada conversa armazenada
+    storedConversations.forEach(contactName => {
+        var newConversation = document.createElement('li');
+        newConversation.classList.add('conversation-container');
+        newConversation.setAttribute('data-contact', contactName);
+        newConversation.innerHTML = '<img src="/images/user.png"> ' + contactName;
+
+        newConversation.onclick = function () {
+            selectConversation(newConversation);
+        };
+
+        conversationList.appendChild(newConversation);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    restoreActiveTab(); 
+    restoreConversations();
+});
 
 window.addEventListener("click", function(event) {
     var dropdownButton = document.querySelector(".dropdown_interests-button");
@@ -345,18 +466,22 @@ window.addEventListener("click", function(event) {
     }
 });
 
+function clearUserConversations() {
+    const storageKey = getLocalStorageKey();
+    localStorage.removeItem(storageKey);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     var userInterests = document.getElementById("interestsList");
     var interestsContainer = document.getElementById("interestsContainer");
     var noInterestsMessage = document.getElementById("noInterestsMessage");
 
-    // Verifica se há interesses para mostrar
     if (userInterests && userInterests.childElementCount > 0) {
-        interestsContainer.style.display = "block"; // Mostra o container dos interesses
-        if (noInterestsMessage) noInterestsMessage.style.display = "none";  // Oculta a mensagem de "No interests selected"
+        interestsContainer.style.display = "block"; 
+        if (noInterestsMessage) noInterestsMessage.style.display = "none";  
     } else {
-        interestsContainer.style.display = "none";  // Oculta o container dos interesses
-        if (noInterestsMessage) noInterestsMessage.style.display = "block"; // Mostra a mensagem de "No interests selected"
+        interestsContainer.style.display = "none";  
+        if (noInterestsMessage) noInterestsMessage.style.display = "block"; 
     }
 });
 
