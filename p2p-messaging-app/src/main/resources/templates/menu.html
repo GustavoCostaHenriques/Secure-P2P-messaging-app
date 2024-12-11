@@ -15,6 +15,17 @@
             <h1>CryptaLink</h1>
         </div>
         <div class="right-section">
+            <div class="search-icon">
+                <img src="/images/search.png" alt="Search" onclick="toggleSearchContainer()">
+            </div>
+            <div class="search-container" id="search-container" style="display: none;">
+                <input type="text" id="searchMessage" placeholder="Search message...">
+                <button type="button" onclick="searchMessage()">Search</button>
+                <p></p>
+                <div class="search-messages">
+                    <!-- Search Messages will appear here -->
+                </div>
+            </div>
             <img src="/images/user.png" id="userIcon" onclick="toggleDropdown()">
             <!-- Dropdown content -->
             <div class="dropdown" id="userDropdown">
@@ -63,7 +74,7 @@
         <h2>Talk with:</h2>
         <p id="errorMessage" style="color: red; display: none;">User doesn't exist.</p>
         <p id="errorMessage1" style="color: red; display: none;">This is your own name.</p>
-        <input type="text" id="contactName" placeholder="Enter contact name">
+        <input type="text" id="contactName" required placeholder="Enter contact name">
         <button onclick="startChat()">Start Chat</button>
     </div>
     <div class="content">
@@ -74,7 +85,7 @@
                 <span id="groupsTab" class="tab" onclick="showGroups()">Groups</span>
                 <img src="/images/add_contact.png" class="add-contact-icon" id="addContactIcon" onclick="toggleAddContactDropdown()">
             </div>
-            <ul id="chatsList" class="conversation-list">
+            <ul id="chatsList" class="conversation-list" style="display: block;">
                 <li th:each="contact : ${contacts}"> 
                     <div class="conversation-container" th:data-contact="${contact}" onclick="selectConversation(this)">
                         <img src="/images/user.png">

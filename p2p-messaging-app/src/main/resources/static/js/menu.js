@@ -1,11 +1,16 @@
 // Toggle the user dropdown
 function toggleDropdown() {
     var userDropdown = document.getElementById('userDropdown');
+    var searchContainer = document.getElementById('search-container');
     var addContactDropdown = document.getElementById('addContactDropdown');
     
     // If the Add Contact dropdown is open, close it
     if (addContactDropdown.style.display === 'block') {
         addContactDropdown.style.display = 'none';
+    }
+
+    if (searchContainer.style.display === 'block') {
+        searchContainer.style.display = 'none';
     }
 
     // Toggle the user dropdown
@@ -19,6 +24,7 @@ function toggleDropdown() {
 // Toggle the add contact dropdown
 function toggleAddContactDropdown() {
     var userDropdown = document.getElementById('userDropdown');
+    var searchContainer = document.getElementById('search-container');
     var addContactDropdown = document.getElementById('addContactDropdown');
     document.getElementById('errorMessage').style.display = 'none';
     document.getElementById('errorMessage1').style.display = 'none';
@@ -27,6 +33,10 @@ function toggleAddContactDropdown() {
     // If the User dropdown is open, close it
     if (userDropdown.style.display === 'block') {
         userDropdown.style.display = 'none';
+    }
+
+    if (searchContainer.style.display === 'block') {
+        searchContainer.style.display = 'none';
     }
 
     // Toggle the add contact dropdown
@@ -47,6 +57,29 @@ function toggleInterestsList() {
     } else {
         interestsList.style.display = "none";
         toggleButton.textContent = "Show Interests";
+    }
+}
+
+function toggleSearchContainer() {
+    var searchContainer = document.getElementById('search-container');
+    var userDropdown = document.getElementById('userDropdown');
+    var addContactDropdown = document.getElementById('addContactDropdown');
+    var dropdownMenu = document.getElementById("dropdown_interests-menu");
+
+    if (userDropdown.style.display === 'block') {
+        userDropdown.style.display = 'none';
+    }
+    if (addContactDropdown.style.display === 'block') {
+        addContactDropdown.style.display = 'none';
+    }
+    if (dropdownMenu.style.display === 'block') {
+        dropdownMenu.style.display = 'none';
+    }
+
+    if (searchContainer.style.display === 'none' || searchContainer.style.display === '') {
+        searchContainer.style.display = 'block';
+    } else {
+        searchContainer.style.display = 'none';
     }
 }
 
@@ -278,9 +311,46 @@ function toggleChatPanel() {
     }
 }
 
-function loadGroupMessages(peerId, contactName) {
-}
+function loadGroupMessages(peerId, groupName) {
+    const chatMessagesContainer = document.querySelector('.chat-messages');
+    chatMessagesContainer.innerHTML = ''; // Clear existing messages
 
+    fetch(`/loadGroupChat?peerId=${peerId}&groupName=${groupName}`)
+        .then(response => response.json())
+        .then(messages => {
+            messages.forEach(message => {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+
+                const [timestampAndSender, messageContent] = message.split('] ');
+                const [fullTimestamp, sender] = timestampAndSender.split('-[');
+                const senderId = sender.replace('[', '').replace(']', '');
+
+                if (senderId === peerId) {
+                    // Message sent from this user
+                    messageElement.classList.add('sent');
+                    messageElement.innerHTML = `
+                        <p>${messageContent}</p>
+                        <span class="timestamp">${fullTimestamp}</span>
+                    `;
+                } else {
+                    // Message received from another peer
+                    messageElement.classList.add('received');
+                    messageElement.innerHTML = `
+                        <span class="sender">${senderId}</span>
+                        <p>${messageContent}</p>
+                        <span class="timestamp">${fullTimestamp}</span>
+                    `;
+                }
+
+                chatMessagesContainer.appendChild(messageElement);
+            });
+            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+        })
+        .catch(error => {
+            console.error('Error loading messages:', error);
+        });
+}
 
 function loadChatMessages(peerId, contactName) {
     const chatMessagesContainer = document.querySelector('.chat-messages');
@@ -297,22 +367,20 @@ function loadChatMessages(peerId, contactName) {
                 const [fullTimestamp, sender] = timestampAndSender.split('-[');
                 const senderId = sender.replace('[', '').replace(']', '');
 
-                const time = fullTimestamp.split('T')[1].substring(0, 5); 
-
                 if (senderId === peerId) {
-                    // Mensagem enviada pelo próprio utilizador (sem o nome)
+                    // Message sent from this user
                     messageElement.classList.add('sent');
                     messageElement.innerHTML = `
                         <p>${messageContent}</p>
-                        <span class="timestamp">${time}</span>
+                        <span class="timestamp">${fullTimestamp}</span>
                     `;
                 } else {
-                    // Mensagem recebida (com o nome do remetente)
+                    // Message received from another peer
                     messageElement.classList.add('received');
                     messageElement.innerHTML = `
                         <span class="sender">${senderId}</span>
                         <p>${messageContent}</p>
-                        <span class="timestamp">${time}</span>
+                        <span class="timestamp">${fullTimestamp}</span>
                     `;
                 }
 
@@ -333,27 +401,49 @@ function sendMessage() {
     if (message) {
         const activeConversation = document.querySelector('.conversation-container.active');
         const contactName = activeConversation.getAttribute("data-contact");
-        
-        var urlParams = new URLSearchParams(window.location.search);
-        var peerId = urlParams.get('peerId');
-        // Clear the input field after sending
-        fetch('/sendMessage?peerId=' + peerId + '&contactName=' + contactName + '&message=' + message, {
-            method: 'POST',
-        })
-        .then(response => response.text())
-        .then(result => {
-            if (result === 'success') {
-                loadChatMessages(peerId,contactName);
-            } else if (result === 'not found') {
-                document.getElementById('errorMessage2').style.display = 'block';
-            }
-            else {
-                console.error('An error occurred.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
+        const groupName = activeConversation.getAttribute("data-group");
+
+        if(contactName) {
+            var urlParams = new URLSearchParams(window.location.search);
+            var peerId = urlParams.get('peerId');
+            // Clear the input field after sending
+            fetch('/sendMessage?peerId=' + peerId + '&contactName=' + contactName + '&message=' + message, {
+                method: 'POST',
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result === 'success') {
+                    loadChatMessages(peerId,contactName);
+                } else if (result === 'not found') {
+                    document.getElementById('errorMessage2').style.display = 'block';
+                }
+                else {
+                    console.error('An error occurred.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        } else if(groupName) {
+            var urlParams = new URLSearchParams(window.location.search);
+            var peerId = urlParams.get('peerId');
+            // Clear the input field after sending
+            fetch('/sendGroupMessage?peerId=' + peerId + '&groupName=' + groupName + '&message=' + message, {
+                method: 'POST',
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result === 'success') {
+                    loadGroupMessages(peerId,groupName);
+                } else {
+                    console.error('An error occurred.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+
 
         messageInput.value = '';
     }
@@ -469,6 +559,62 @@ window.addEventListener("click", function(event) {
 function clearUserConversations() {
     const storageKey = getLocalStorageKey();
     localStorage.removeItem(storageKey);
+}
+
+function searchMessage() {
+    const searchMessageInput = document.getElementById('searchMessage');
+    const searcMessage = searchMessageInput.value.trim();
+    const searchMessagesContainer = document.querySelector('.search-messages');
+    searchMessagesContainer.innerHTML = '';
+
+    if(searcMessage) {
+        var urlParams = new URLSearchParams(window.location.search);
+        var peerId = urlParams.get('peerId');
+        fetch('/searchMessage?peerId=' + peerId + '&searchMessage=' + searcMessage, {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(messagesFound => {
+            messagesFound.forEach(message => {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('Searchmessage');
+
+                const [timestampAndSender, messageContent] = message.split('] ');
+                const [fullTimestamp, sender] = timestampAndSender.split('-[');
+                const senderIdAndGroupName = sender.replace('[', '').replace(']', '');
+                var [senderId, fieldName] = senderIdAndGroupName.split(',');
+                
+                if(senderId == peerId) {
+                    senderId = "Myself";
+                }
+
+                if (!fieldName || fieldName == "null") {
+                    // Message found in an individual conversation
+                    messageElement.classList.add('individual-message'); 
+                    messageElement.innerHTML = `
+                        <span>${senderId}</span>
+                        <p>${messageContent}</p>
+                        <span class="timestamp">${fullTimestamp}</span>
+                    `;
+                } else {
+                    // Message found in a group
+                    messageElement.classList.add('group-message'); 
+                    messageElement.innerHTML = `
+                        <p>${senderId} | ${fieldName}</p>
+                        <p>${messageContent}</p>
+                        <span class="timestamp">${fullTimestamp}</span>
+                    `;
+                }
+
+                searchMessagesContainer.appendChild(messageElement);
+            });
+            searchMessagesContainer.scrollTop = searchMessagesContainer.scrollHeight;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {

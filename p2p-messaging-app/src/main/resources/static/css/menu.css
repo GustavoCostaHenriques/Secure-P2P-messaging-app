@@ -42,11 +42,15 @@ body {
 }
 
 .top-bar .right-section {
-    position: relative; 
+    display: flex; 
+    flex-direction: row; 
+    align-items: center; 
+    gap: 10px; 
+    position: relative;
 }
 .top-bar .right-section img {
     width: 40px;
-    margin-right: 10px;
+    margin-right: 20px;
     cursor: pointer;
 }
 
@@ -248,6 +252,7 @@ body {
     padding: 15px;
     border-radius: 5px;
     width: 200px;
+    z-index: 1;
 }
 .dropdown-add-contact p {
     margin: 0 0 10px;
@@ -323,7 +328,7 @@ body {
     margin: 0;
     overflow-y: auto;
     flex-grow: 1;
-    display: none; /* Chats or Groups will be toggled */
+    display: block; 
 }
 
 .conversation-list.active {
@@ -417,6 +422,35 @@ body {
     position: relative;
 }
 
+.Searchmessage {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    max-width: 70%;
+    word-wrap: break-word;
+    position: relative;
+    background-color: #e0f7fa; 
+}
+
+.Searchmessage.group-message {
+    background-color: #cfcfcf; 
+}
+
+.Searchmessage.individual-message {
+    background-color: #ffffff; 
+}
+
+.Searchmessage .timestamp {
+    font-size: 0.8em;
+    color: #555;
+    position: absolute;
+    bottom: 5px;
+    right: 10px;
+}
+
+
 .message .sender {
     font-weight: bold;
     color: #555;
@@ -472,4 +506,54 @@ body {
     width: 40px;
     cursor: pointer;
     margin-right: 20px;
+}
+
+.search-icon img {
+    width: 40px;
+    cursor: pointer;
+}
+
+
+.search-container {
+    display: none;
+    position: absolute;
+    top: 50px;
+    left: -120%;
+    transform: translateX(-50%);
+    background-color: #65a7e1;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+    width: 400px; /* Largura ajustada para acomodar o botão */
+    display: flex; /* Flexbox para alinhamento */
+    gap: 10px; /* Espaço entre o input e o botão */
+    align-items: center;
+}
+
+
+.search-container input {
+    width: 70%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1em;
+}
+
+.search-container button {
+    background-color: white; 
+    color: black; 
+    border: 1px solid #ccc; 
+    padding: 10px 20px; 
+    border-radius: 5px; 
+    font-size: 1em; 
+    cursor: pointer; 
+    transition: background-color 0.3s ease, color 0.3s ease; 
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);    
+}
+
+.search-container button:hover {
+    background-color: #f0f0f0; 
+    color: #333; 
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);   
 }
