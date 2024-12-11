@@ -3,14 +3,18 @@ package com.p2pmessagingapp;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.firestore.CollectionReference;
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.firebase.cloud.FirestoreClient;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class FirebaseService {
@@ -20,7 +24,7 @@ public class FirebaseService {
         try {
             if (FirebaseApp.getApps().isEmpty()) {
                 FileInputStream serviceAccount = new FileInputStream(
-                        "src/main/resources\\cryptalink-271d1-firebase-adminsdk-zt96q-5b9d7e28c8.json");
+                        "src/main/resources\\cryptalink-271d1-481d81d40630.json");
 
                 FirebaseOptions options = FirebaseOptions.builder()
                         .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -29,9 +33,15 @@ public class FirebaseService {
                 FirebaseApp.initializeApp(options);
             }
             db = FirestoreClient.getFirestore();
+        } catch (IllegalStateException e) {
+            db = FirestoreClient.getFirestore();
         } catch (IOException e) {
             System.err.println("Failed to initialize Firebase: " + e.getMessage());
         }
+    }
+
+    public Firestore getDb() {
+        return db;
     }
 
     /**
@@ -94,4 +104,57 @@ public class FirebaseService {
             }
         }
     }
+
+    public List<String> listObjects(String bucket, String prefix) {
+        List<String> objectKeys = new ArrayList<>();
+        try {
+            // List all documents in the specified collection
+            db.collection(bucket)
+                    .listDocuments()
+                    .forEach(documentReference -> {
+                        String documentPath = documentReference.getPath();
+                        if (documentPath.startsWith(prefix)) {
+                            objectKeys.add(documentPath);
+                        }
+                    });
+        } catch (Exception e) {
+            System.err.println("Error listing objects in Firebase: " + e.getMessage());
+        }
+        return objectKeys;
+    }
+
+    public void deleteObjects(List<String> bucketNames, String userId, Firestore db) {
+        try {
+            for (String bucketName : bucketNames) {
+                String userPrefix = bucketName + "/CHATS/" + userId; // Specific prefix of the user.
+
+                CollectionReference collectionRef = db.collection(userPrefix);
+
+                List<QueryDocumentSnapshot> documents = collectionRef.get().get().getDocuments();
+
+                for (DocumentSnapshot doc : documents) {
+                    db.collection(userPrefix).document(doc.getId()).delete().get();
+                    System.out.println("Deleted document with ID: " + doc.getId());
+                }
+
+            }
+
+            for (String bucketName : bucketNames) {
+                String userPrefix = bucketName + "/KEYS/" + userId; // Specific prefix of the user.
+
+                CollectionReference collectionRef = db.collection(userPrefix);
+
+                List<QueryDocumentSnapshot> documents = collectionRef.get().get().getDocuments();
+
+                for (DocumentSnapshot doc : documents) {
+                    db.collection(userPrefix).document(doc.getId()).delete().get();
+                    System.out.println("Deleted document with ID: " + doc.getId());
+                }
+
+            }
+        } catch (Exception e) {
+            System.err.println("Error deleting objects: " + e.getMessage());
+        }
+    }
+
 }

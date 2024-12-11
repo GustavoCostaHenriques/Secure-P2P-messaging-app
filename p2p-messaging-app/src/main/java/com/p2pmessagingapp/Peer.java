@@ -8,7 +8,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.ObjectOutputStream;
 import java.io.FileOutputStream;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -18,20 +17,16 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.math.BigInteger;
-
 import java.nio.charset.StandardCharsets;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.*;
 import java.security.cert.X509Certificate;
-
 import javax.security.auth.x500.X500Principal;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -43,15 +38,24 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 
+import com.amazonaws.AmazonServiceException;
+import com.amazonaws.SdkClientException;
+import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectRequest;
-
+import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.codahale.shamir.Scheme;
+import com.google.cloud.firestore.CollectionReference;
+import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.QueryDocumentSnapshot;
+import com.google.firebase.cloud.FirestoreClient;
 
 import io.github.cdimascio.dotenv.Dotenv;
-
-import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 
 /**
  * The Peer class represents a peer in the P2P messaging application.
@@ -64,8 +68,12 @@ public class Peer {
     private SSLSocket sslServerSocket; // SSL server socket for communication with server
     private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
     private List<String> interests = new ArrayList<>(); // List of interests
-    private final List<Message> messageHistory = new CopyOnWriteArrayList<>(); // List to store all messages for this
+    private final List<Message> messageHistory = new CopyOnWriteArrayList<>(); // List to store all individual messages
+                                                                               // for this
                                                                                // peer
+    private final List<Message> messageGroupHistory = new CopyOnWriteArrayList<>(); // List to store all group messages
+                                                                                    // for this
+    // peer
     private PeerServer serverThread; // Thread for the peer server
     private boolean verificationStatus = true; // Boolean that checks the values of this peer
     private boolean repeatedId = false; // Boolean that checks the values of this peer
@@ -73,18 +81,33 @@ public class Peer {
     private User user; // User that will be created for this peer
     private final String serverIp = "localhost"; // IP of the server that has information about other peers
     private final int serverPort = 2222; // Port of the server that has information about other peers
-    private boolean firstMessageSent = true; // Bool that checks if it's the first message that this peer is sending
-    private SecretKey aesKey; // Secret Key of the peer to encrypt messages to store in the cloud
+    private boolean firstMessageSent = true; // Bool that checks if it's the first message that this peer is sending to
+                                             // the cloud.
+    private SecretKey aesKey; // Secret Key of the peer to encrypt messages to store in the cloud.
+    private int NumberOfKeysFound = 1; // Integer to know how many key parts this peer found.
+    private Map<Integer, byte[]> keyParts = new HashMap<>(); // HashMap to store the 8 parts necessary to reconstruct
+                                                             // the key.
+    private Scheme scheme = new Scheme(new SecureRandom(), 12, 8); // 12 parts to divide the key, minimum of 8 to
+                                                                   // reconstruct.
     private volatile User userFound; // Using 'volatile' on serverResponse to ensure visibility across threads and
-                                     // prevent infinite loop due to caching issues
-    private Map<String, Key> groupKeys = new HashMap<>();
+                                     // prevent infinite loop due to caching issues,
+    private Key groupKey;
+    private List<User> allUsers;
     // Variables that will store the paths for the keystore, truststore and server
-    // certificate
+    // certificate.
     private String keyStoreFile;
     private String trustStoreFile;
     private String serverCertFile;
-    private String password; // Password of this user, to manage the security of keystore and truststore
-    private X509Certificate cert; // Certificate of thi user
+    private String password; // Password of this user, to manage the security of keystore and truststore.
+    private X509Certificate cert; // Certificate of this user.
+
+    private final String[] interestsDefault = { // All the existing interests.
+            "Technology", "Sports and Fitness", "Travel", "Music", "Movies and TV",
+            "Reading and Literature", "Health and Wellness", "Food and Cooking", "Nature and Sustainability",
+            "Art and Culture", "Science and Innovation", "History", "Animals and Pets", "Personal Development",
+            "Gaming and Entertainment", "Fashion and Style", "Politics and Society", "Photography",
+            "Spirituality and Meditation", "Education and Learning"
+    };
 
     /**
      * Starts the peer, setting up necessary SSL configuration and launching the
@@ -103,6 +126,14 @@ public class Peer {
         }
         this.interests = interests;
 
+        for (String interest : this.interestsDefault) {
+            if (this.values[0].equals(interest)) {
+                setVerificationStatus(this, false); // Mark verification as failed
+                setRepeatedId(this, true); // Indicate duplicate ID found (in this case on ID is duplicate but the user
+                                           // can't have the name of an interest)
+            }
+        }
+
         // Define paths and passwords for KeyStore and TrustStore files
         keyStoreFile = "peer_keystore_" + this.values[0] + ".jks";
         trustStoreFile = "peer_truststore_" + this.values[0] + ".jks";
@@ -118,14 +149,14 @@ public class Peer {
         }
 
         // Generate new KeyStore and TrustStore for the peer
-        generatePeerKeyStore("peerAlias", password, keyStoreFile);
-        generateTrustStore(trustStoreFile, password);
+        generatePeerKeyStore("peerAlias", password, keyStoreFile); // To store the keyPair and the certificate
+        generateTrustStore(trustStoreFile, password); // Certificates of ther other Peers and Server
 
         // Add server certificate to peer's TrustStore for trusted communication
         addServerCertToPeerTrustStore(trustStoreFile, password, serverCertFile);
 
         // Create a User object with peer's details (for later communication)
-        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests);
+        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests, null);
 
         // Add peer's own certificate to TrustStore for secure, mutual authentication
         addPeerCertificateToTrustStore(user, trustStoreFile, password);
@@ -154,6 +185,20 @@ public class Peer {
 
             // Send initial user data to the server
             sendMessageToServer(user);
+
+            String objectKey = "KEYS/" + this.values[0];
+            this.searchMessage(null, objectKey);
+            if (!firstMessageSent) {
+                objectKey = "CHATS/" + this.values[0];
+                List<Message> messagesFound = this.searchMessage("NULL", objectKey);
+
+                for (Message message : messagesFound) {
+                    if (message.getBroadcastMsg())
+                        this.addMessageGroupToHistory(message);
+                    else
+                        this.addMessageToHistory(message);
+                }
+            }
 
             // Keep the program running indefinitely
             keepProgramRunning();
@@ -190,7 +235,7 @@ public class Peer {
         addPeerCertificateToTrustStore(sender, trustStoreFile, password);
 
         // Create a User instance for this peer with the given ID, IP, and port
-        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests);
+        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests, null);
 
         // Create an SSL socket for secure communication with the given IP and port
         this.sslSocket = createSSLSocket(ip, port, keyStoreFile, trustStoreFile, password);
@@ -216,12 +261,15 @@ public class Peer {
      * Asks the server for the user with the otherPeerID and returns this user.
      * 
      * @param otherPeerID Id of the peer we want to communicate with.
+     * @param sendingMsg  Boolean to know if we are checking a user to send a
+     *                    message or simply to see if the user exists.
+     *
      * @return The User that the server sends (this user can have the id equal to
      *         "NULL" meaning that the user was not found).
      */
-    public User checkscommunication(String otherPeerID) throws Exception {
+    public User checkscommunication(String otherPeerID, boolean sendingMsg) throws Exception {
 
-        User receiverUser = new User(values[0], null, 0000, otherPeerID, null, null);
+        User receiverUser = new User(values[0], null, 0000, otherPeerID, null, null, null);
         sendMessageToServer(receiverUser);
 
         // Wait for the server response
@@ -238,7 +286,38 @@ public class Peer {
             // communication
             addPeerCertificateToTrustStore(userFound, trustStoreFile, password);
 
+        if (userFound.getId().equals("NULL") && !sendingMsg) { // This means that the server didn't found any user
+            for (Message message : messageHistory) {
+                if (message.getReceiver().getId().equals(otherPeerID)
+                        || message.getSender().getId().equals(otherPeerID))
+                    userFound = new User(otherPeerID, null, 0000, null, null, null, null);
+            }
+        }
+
         return userFound;
+    }
+
+    /**
+     * Asks the user to encrypt the groupName with the appropriate key.
+     *
+     * @param groupName The name of the group that the server is going to encrypt.
+     * @return The groupName encrypted by the server in a string format.
+     */
+    public String askToEncryptGroupNameToServer(String groupName) throws InterruptedException {
+        User userToSend = new User(this.user.getId(), null, (-2), null, this.user.getCertificate(),
+                null, groupName);
+        sendMessageToServer(userToSend);
+
+        // Wait for the server response
+        String groupNameEncrypted = serverThread.getGroupNameEncrypted();
+        while (groupNameEncrypted == null) {
+            Thread.sleep(1000);
+            groupNameEncrypted = serverThread.getGroupNameEncrypted();
+        }
+
+        serverThread.setGroupNameEncrypted(null);
+
+        return groupNameEncrypted;
     }
 
     /**
@@ -249,8 +328,8 @@ public class Peer {
      */
     public void communicate(User receiver, String content) {
 
-        // Create a message and send it to the receiver
-        Message message = new Message(user, receiver, content);
+        // Creates a message
+        Message message = new Message(user, receiver, content, false, null);
 
         try {
 
@@ -258,15 +337,45 @@ public class Peer {
             // Add to the message history
             addMessageToHistory(message);
 
-            LocalDateTime timeStap = LocalDateTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("ddMMyy-HH:mm");
-            String formattedTimestamp = timeStap.format(formatter);
-            String objectKey = "CHATS/" + user.getId() + "/" + receiver.getId() + "_" + formattedTimestamp;
+            String objectKey = "CHATS/" + user.getId() + "/Send_" + receiver.getId() + "_" + message.getTime();
 
             this.sendMessageToCloud(objectKey, content);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Handles the broadcast of a message.
+     *
+     * @param content   The content of the message that is going to be sent.
+     * @param groupName The name of the group that the message is going to be
+     *                  broadcasted.
+     */
+    public void broadcast(String content, String groupName) throws InterruptedException {
+
+        // String encryptedContent = encryptMessageWithABE(content, this.interests);
+
+        for (User receiver : allUsers) {
+            // Creates a message
+            Message message = new Message(user, receiver, content, true, groupName);
+
+            try {
+
+                this.serverThread.sendMessage(message); // Send the message through the server thread
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        Message message = new Message(user, null, content, true, groupName);
+
+        // Add to the message history
+        addMessageGroupToHistory(message);
+
+        String objectKey = "CHATS/" + user.getId() + "/Send_" + groupName + "_" + message.getTime();
+
+        this.sendMessageToCloud(objectKey, content);
     }
 
     /**
@@ -500,10 +609,378 @@ public class Peer {
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
+    // -------------------------------------------------------ABE-ECNRYPTION--------------------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
+    /**
+     * Encrypts the message content using ABE based on the user's interests
+     * (attributes).
+     * This method would apply ABE encryption with a policy based on the user's
+     * interests.
+     *
+     * @param content   The message content to be encrypted.
+     * @param interests The interests (or attributes) of the user.
+     * @return The encrypted message content.
+     */
+    /*
+     * private String encryptMessageWithABE(String content, List<String> interests)
+     * {
+     * try {
+     * // Example ABE encryption logic:
+     * // 1. Generate the ABE policy based on the user's interests (attributes).
+     * String policy = generateABEPolicy(interests);
+     * 
+     * // 2. Encrypt the message using ABE. This involves creating a ciphertext with
+     * // the policy.
+     * PairingCipherSerParameter encryptedMessage = encryptWithABE(content, policy);
+     * 
+     * // Convert PairingCipherSerParameter to byte array using serialization
+     * try (ByteArrayOutputStream byteArrayOutputStream = new
+     * ByteArrayOutputStream();
+     * ObjectOutputStream objectOutputStream = new
+     * ObjectOutputStream(byteArrayOutputStream)) {
+     * objectOutputStream.writeObject(encryptedMessage);
+     * objectOutputStream.flush();
+     * byte[] byteArray = byteArrayOutputStream.toByteArray();
+     * 
+     * // Return the encrypted message as a Base64 string
+     * return Base64.getEncoder().encodeToString(byteArray);
+     * }
+     * } catch (Exception e) {
+     * e.printStackTrace();
+     * return null; // Handle the exception as needed
+     * }
+     * }
+     */
+
+    // -----------------------------------------------------------------------------------------------------------------------------//
+    // ------------------------------------------------------MESSAGE-SEARCHING------------------------------------------------------//
+    // -----------------------------------------------------------------------------------------------------------------------------//
+
+    /**
+     * Searches a message in the cloud.
+     * 
+     * @param messageToBeSearched Content that the user searched.
+     * @param path                The path that is going to be searched in the
+     *                            cloud.
+     * @return The list of the mssages found.
+     */
+    public List<Message> searchMessage(String messageToBeSearched, String path) {
+        List<Message> messagesFound = new ArrayList<>();
+        try {
+            // List of cloud containers to search in
+            String[] awsBuckets = {
+                    Dotenv.load().get("S3_BUCKET_NAME_1"),
+                    Dotenv.load().get("S3_BUCKET_NAME_2"),
+                    Dotenv.load().get("S3_BUCKET_NAME_3"),
+                    Dotenv.load().get("S3_BUCKET_NAME_4")
+            };
+
+            String[] fbContainers = { "bucket_chats1", "bucket_chats2", "bucket_chats3", "bucket_chats4" };
+            String[] azureContainers = { "bucket-chats1", "bucket-chats2", "bucket-chats3", "bucket-chats4" };
+
+            for (int i = 0; i < 3; i++) {
+
+                String cloudService = null;
+                String[] containers = null;
+
+                if (i == 0) {
+                    cloudService = "AWS";
+                    containers = awsBuckets;
+                } else if (i == 1) {
+                    cloudService = "FIREBASE";
+                    containers = fbContainers;
+                } else if (i == 2) {
+                    cloudService = "AZURE";
+                    containers = azureContainers;
+                }
+
+                List<Message> CloudMessages = processSearchForEachService(containers, cloudService, messagesFound,
+                        messageToBeSearched, path);
+
+                for (Message message : CloudMessages) {
+                    messagesFound.add(message);
+                    if (path.charAt(0) == 'K' && messagesFound.size() == 8)
+                        break;
+                }
+                if (path.charAt(0) == 'K' && messagesFound.size() == 8)
+                    break;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return messagesFound;
+    }
+
+    /**
+     * Process the search of messages for a specific cloud service (AWS, Firebase,
+     * Microsoft).
+     * 
+     * @param containers           The containers of a specific cloud service.
+     * @param cloudService         The cloud service that os going to be searched.
+     * @param messagesFoundAlready The messages that were already found.
+     * @param messageToBeSearched  The content that the peer is trying to find.
+     * @param path                 The path that is going to be searched in the
+     *                             cloud.
+     * @return A list of new messages found (in case there is any).
+     */
+    private List<Message> processSearchForEachService(String[] containers, String cloudService,
+            List<Message> messagesFoundAlready, String messageToBeSearched, String path) {
+
+        List<Message> messagesFound = new ArrayList<>();
+
+        for (String container : containers) {
+            List<String> objectKeys = new ArrayList<>();
+            if (cloudService.equals("AWS")) // Fetch all object keys from the AWS bucket for messages.
+                objectKeys = getObjectKeysFromAWSS3Bucket(container, path);
+            else if (cloudService.equals("FIREBASE")) // Fetch all object keys from the Firebase bucket for messages.
+                objectKeys = getObjectKeysFromFirebaseBucket(container, path);
+            else if (cloudService.equals("AZURE"))
+                objectKeys = getObjectKeysFromAzureBucket(container, path);
+
+            // Loop through each object key and check if it matches the search term
+            for (String objectKey : objectKeys) {
+                String messageContent = new String();
+                if (messageToBeSearched != null)
+                    messageContent = fetchAndDecryptMessageFromCloud(container, objectKey, cloudService);
+                else {
+                    if (NumberOfKeysFound <= 8) {
+                        byte[] bytekeyPart = fetchEncryptedContentFromCloud(container, objectKey, cloudService);
+                        keyParts.put(NumberOfKeysFound, bytekeyPart);
+                        NumberOfKeysFound += 1;
+                    }
+                    if (NumberOfKeysFound == 9) {
+                        byte[] reconstructedKeyBytes = scheme.join(keyParts);
+
+                        aesKey = new SecretKeySpec(reconstructedKeyBytes, 0, reconstructedKeyBytes.length, "AES");
+                        firstMessageSent = false;
+
+                        NumberOfKeysFound += 1;
+                    }
+                }
+
+                if (messageToBeSearched != null) {
+                    String[] parts = objectKey.replace(path + "/", "").split("_");
+
+                    Message message = buildMessage(parts, messageContent);
+
+                    // If message contains the searched text, add it to the result
+                    if ((message != null && messageContent.contains(messageToBeSearched))
+                            || (message != null && messageToBeSearched.equals("NULL"))) {
+                        boolean messageExists = false;
+                        for (Message singleMessage : messagesFoundAlready) {
+                            if (message.equals(singleMessage)) // Checks if the message was already found
+                                messageExists = true;
+                        }
+                        for (Message singlMessage : messagesFound) {
+                            if (message.equals(singlMessage))
+                                messageExists = true;
+                        }
+                        if (!messageExists) {
+                            messagesFound.add(message);
+                        }
+                    }
+                }
+
+            }
+        }
+
+        return messagesFound;
+    }
+
+    /**
+     * Fetches and decrypts the message content from the cloud (AWS, Firebase, or
+     * Azure).
+     * 
+     * @param container    The container from which to fetch the message.
+     * @param objectKey    The object key that identifies the specific message.
+     * @param cloudService The service that we are searching.
+     * @return The decrypted message content.
+     */
+    private String fetchAndDecryptMessageFromCloud(String container, String objectKey, String cloudService) {
+        try {
+            // Fetch the encrypted content from the cloud storage (AWS, Firebase, Azure)
+            byte[] encryptedContent = fetchEncryptedContentFromCloud(container, objectKey, cloudService);
+
+            // Decrypt the content
+            Cipher cipher = Cipher.getInstance("AES");
+            cipher.init(Cipher.DECRYPT_MODE, aesKey);
+            byte[] decryptedContent = cipher.doFinal(encryptedContent);
+
+            // Convert decrypted byte array to string
+            return new String(decryptedContent, StandardCharsets.UTF_8);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Fetches encrypted content from Firebase Storage.
+     *
+     * @param container The Firebase bucket name.
+     * @param objectKey The object key identifying the message.
+     * @return A byte array containing the encrypted content, or null if an error
+     *         occurs.
+     */
+    private byte[] fetchEncryptedContentFromCloud(String container, String objectKey, String cloudService) {
+        if (cloudService.equals("AWS")) {
+            try {
+                // Fetch the object from AWS S3
+                S3Object s3Object = S3Config.s3Client.getObject(new GetObjectRequest(container, objectKey));
+
+                // Read the content into a byte array
+                InputStream inputStream = s3Object.getObjectContent();
+                byte[] content = inputStream.readAllBytes();
+                inputStream.close();
+
+                return content;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else if (cloudService.equals("FIREBASE")) {
+            try {
+                // Access Firestore database
+                Firestore db = FirestoreClient.getFirestore();
+
+                // Fetch the document from Firestore
+                DocumentSnapshot document = db.collection(container).document(objectKey).get().get();
+
+                if (document.exists()) {
+                    // Retrieve the content field from the document
+                    String base64Content = document.getString("content");
+
+                    if (objectKey.charAt(0) == 'K')
+                        base64Content = document.getString("keyPart");
+
+                    if (base64Content != null) {
+                        // Decode Base64 content into a byte array
+                        return Base64.getDecoder().decode(base64Content);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else if (cloudService.equals("AZURE")) {
+            try {
+                // Access the Azure Blob Storage service
+                AzureBlobService azureBlobService = new AzureBlobService();
+
+                // Fetch the blob content
+                return azureBlobService.fetchBlobContent(container, objectKey);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retrieves all object keys from the AWS S3 buckets that match the pattern
+     * for a specific user.
+     * 
+     * @param bucket The specific bucket that we are .
+     * @param path   The path that is going to be searched in the cloud.
+     * @return List of object keys that belong to the user.
+     */
+    public List<String> getObjectKeysFromAWSS3Bucket(String bucket, String path) {
+
+        List<String> objectKeys = new ArrayList<>();
+        String userPrefix = path + "/"; // Prefix pattern for the current user.
+
+        if (path.charAt(0) == 'K')
+            userPrefix = path;
+
+        try {
+            // List objects in the current bucket with the specified prefix
+            ObjectListing objectListing = S3Config.s3Client.listObjects(bucket, userPrefix);
+            List<S3ObjectSummary> summaries = objectListing.getObjectSummaries();
+
+            for (S3ObjectSummary summary : summaries) {
+                objectKeys.add(summary.getKey()); // Add the object key to the result list
+            }
+
+            // Handle pagination in case there are too many objects for a single response
+            while (objectListing.isTruncated()) {
+                objectListing = S3Config.s3Client.listNextBatchOfObjects(objectListing);
+                summaries = objectListing.getObjectSummaries();
+
+                for (S3ObjectSummary summary : summaries) {
+                    objectKeys.add(summary.getKey());
+                }
+            }
+        } catch (AmazonServiceException e) {
+            System.err.println("Error communicating with AWS S3: " + e.getMessage());
+            e.printStackTrace();
+        } catch (SdkClientException e) {
+            System.err.println("SDK error when accessing AWS S3: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return objectKeys;
+    }
+
+    /**
+     * Retrieves all object keys from a Firebase Storage bucket that match a
+     * specific user's prefix.
+     *
+     * @param bucket The Firebase Storage bucket name.
+     * @param path   The path that is going to be searched in the cloud.
+     * @return List of object keys belonging to the user.
+     */
+    public List<String> getObjectKeysFromFirebaseBucket(String bucketName, String path) {
+        List<String> objectKeys = new ArrayList<>();
+        String userPrefix = bucketName + "/" + path; // Specific prefix of the user.
+
+        try {
+            // Reference to the collection in Firestore
+            FirebaseService firebaseService = new FirebaseService();
+            Firestore db = firebaseService.getDb();
+            CollectionReference collectionRef = db.collection(userPrefix);
+
+            // Fetch all documents in the collection
+            List<QueryDocumentSnapshot> documents = collectionRef.get().get().getDocuments();
+
+            for (DocumentSnapshot doc : documents) {
+                String objectKey = doc.getId(); // Use the document ID as the object key
+                String finalObjectKey = path + "/" + objectKey;
+                objectKeys.add(finalObjectKey); // Add to the list only if it matches the prefix
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao acessar Firebase Storage: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return objectKeys;
+    }
+
+    /**
+     * Retrieves all object keys from a Firebase Storage bucket that match a
+     * specific user's prefix.
+     *
+     * @param bucket The Firebase Storage bucket name.
+     * @param path   The path that is going to be searched in the cloud.
+     * @return List of object keys belonging to the user.
+     */
+    public List<String> getObjectKeysFromAzureBucket(String bucketName, String path) {
+        List<String> objectKeys = new ArrayList<>();
+        String userPrefix = path + "/";
+
+        if (path.charAt(0) == 'K')
+            userPrefix = path;
+
+        AzureBlobService azureBlobService = new AzureBlobService();
+        objectKeys = azureBlobService.listBlobsInDirectory(bucketName, userPrefix);
+        return objectKeys;
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------------------//
     // ------------------------------------------------CLOUD-STORAGE-UNITS-MANAGEMENT-----------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
 
-    private void sendMessageToCloud(String objectKey, String content) {
+    public void sendMessageToCloud(String objectKey, String content) {
 
         try {
 
@@ -527,10 +1004,9 @@ public class Peer {
             if (firstMessageSent) {
                 // Store key shares across different storage providers
                 // Split the AES key using Shamir's Secret Sharing
-                Scheme scheme = new Scheme(new SecureRandom(), 12, 8); // 12 parts, minimum of 8 to reconstruct
                 Map<Integer, byte[]> keyShares = scheme.split(aesKey.getEncoded());
 
-                storeKeyShares(keyShares, metadata);
+                storeKeyShares(keyShares);
             }
             firstMessageSent = false;
         } catch (Exception e) {
@@ -570,15 +1046,20 @@ public class Peer {
         }
     }
 
-    private void storeKeyShares(Map<Integer, byte[]> keyShares, ObjectMetadata metadata) {
+    private void storeKeyShares(Map<Integer, byte[]> keyShares) {
         int count = 0;
 
         // Store key shares in AWS
         for (Map.Entry<Integer, byte[]> share : keyShares.entrySet()) {
             if (count < 4) {
                 String awsBucket = Dotenv.load().get("S3_BUCKET_NAME_" + (count + 1));
+
+                ObjectMetadata keyMetadata = new ObjectMetadata();
+                keyMetadata.setContentLength(share.getValue().length);
+                keyMetadata.addUserMetadata("keyPart", String.valueOf(count));
+
                 S3Config.s3Client.putObject(new PutObjectRequest(awsBucket, "KEYS/" + this.values[0],
-                        new ByteArrayInputStream(share.getValue()), metadata));
+                        new ByteArrayInputStream(share.getValue()), keyMetadata));
             }
             count++;
             if (count >= 12)
@@ -631,11 +1112,13 @@ public class Peer {
      * @throws IOException If an I/O error occurs during the killing operations.
      */
     public void killClient(Peer peer) throws IOException {
-        User user = new User(peer.values[0], null, 0000, null, null, null);
+        User user = new User(peer.values[0], null, 0000, null, null, null, null);
         sendMessageToServer(user);
         peer.serverThread.closeServerSocket(); // Closes server socket
         deleteSecureFiles(peer);
         clearMessageHistory();
+        clearMessageGroupHistory();
+        peer.interests = null;
     }
 
     /**
@@ -721,7 +1204,7 @@ public class Peer {
      * @param id The ID of the user to find.
      */
     public void findReceiver(String id) {
-        User receiverUser = new User(this.user.getId(), null, 0000, id, null, null);
+        User receiverUser = new User(this.user.getId(), null, 0000, id, null, null, null);
         sendMessageToServer(receiverUser);
     }
 
@@ -741,6 +1224,61 @@ public class Peer {
         }
 
         return byteArrayOutputStream.toByteArray(); // Return the byte array
+    }
+
+    /**
+     * Builds a message with the information received from the cloud.
+     *
+     * @param parts          A list of strings to build the message.
+     * @param messageContent The content to store in a message.
+     * @return A message.
+     */
+    private Message buildMessage(String[] parts, String messageContent) {
+
+        boolean groupMessage = false;
+        Message message = null;
+
+        if (parts.length == 3) { // Individual messages or messages sent in a group
+            String direction = parts[0];
+            String otherPeer = parts[1];
+            User otherUser = new User(otherPeer, null, 0, null, null, null, null);
+            String time = parts[2];
+            if (direction.equals("Send")) {
+                for (String interest : this.interestsDefault) {
+                    if (otherPeer.equals(interest)) { // this means that we found a group message sent by
+                                                      // this peer
+                        message = new Message(user, null, messageContent, true, otherPeer);
+                        message.setTime(time);
+                        groupMessage = true;
+                    }
+                }
+                if (!groupMessage) {
+                    message = new Message(user, otherUser, messageContent, false, null);
+                    message.setTime(time);
+                }
+
+            } else {
+                message = new Message(otherUser, user, messageContent, false, null);
+                message.setTime(time);
+            }
+        }
+
+        else if (parts.length == 4) { // Messages received in a group
+            String direction = parts[0];
+            String otherPeer = parts[1];
+            User otherUser = new User(otherPeer, null, 0, null, null, null, null);
+            String groupName = parts[2];
+            String time = parts[3];
+            if (direction.equals("Send")) {
+                message = new Message(user, otherUser, messageContent, true, groupName);
+                message.setTime(time);
+            } else {
+                message = new Message(otherUser, user, messageContent, true, groupName);
+                message.setTime(time);
+            }
+        }
+
+        return message;
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -764,6 +1302,19 @@ public class Peer {
                 .filter(msg -> msg.getSender().getId().equals(userId) || msg.getReceiver().getId().equals(userId))
                 .collect(Collectors.toList());
     }
+
+    public List<Message> getMessageGroupHistory() {
+        return new ArrayList<>(messageGroupHistory); // Returns a copy to prevent external modifications
+    }
+
+    public void clearMessageGroupHistory() {
+        messageGroupHistory.clear();
+    }
+
+    public void addMessageGroupToHistory(Message message) {
+        messageGroupHistory.add(message);
+    }
+
     // -----------------------------------------------------------------------------------------------------------------------------//
     // ----------------------------------------------------GETTERS-AND-SETTERS------------------------------------------------------//
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -795,7 +1346,7 @@ public class Peer {
         user.setInterests(interests);
         this.interests = interests;
         User userToSend = new User(this.user.getId(), this.user.getIp(), 0000, null, this.user.getCertificate(),
-                this.user.getInterests());
+                this.user.getInterests(), null);
         sendMessageToServer(userToSend);
     }
 
@@ -848,12 +1399,47 @@ public class Peer {
     }
 
     /**
-     * Sets the GroupKeys of the peer.
+     * Gets the groupKey of the peer.
+     *
+     * @return The groupKey of the peer.
      */
-    public void setGroupKeys(Peer peer, Map<String, Key> groupKeys) {
-        peer.groupKeys = groupKeys;
-        for (Map.Entry<String, Key> entry : groupKeys.entrySet()) {
-            System.out.println("Interest: " + entry.getKey() + " | Key: " + entry.getValue());
+    public Key getGroupKey() {
+        return this.groupKey;
+    }
+
+    /**
+     * Sets the GroupKey of the peer.
+     */
+    public void setGroupKey(Peer peer, Key groupKey) {
+        peer.groupKey = groupKey;
+    }
+
+    /**
+     * Gets all the Users that exist.
+     *
+     * @return All users.
+     */
+    public List<User> getAllUsers() throws Exception {
+
+        User userToSend = new User(this.user.getId(), null, (-1), null, this.user.getCertificate(),
+                null, null);
+        sendMessageToServer(userToSend);
+
+        allUsers = serverThread.getAllUsers();
+        while (allUsers == null) {
+            allUsers = serverThread.getAllUsers();
         }
+
+        serverThread.setAllUsers(null);
+
+        for (User simpleUser : allUsers) {
+            // If the user was found, add their certificate to this peer's TrustStore
+            if (!simpleUser.getId().equals("NULL") && simpleUser.getCertificate() != null)
+                // Add the certificate of the found peer to the TrustStore for secure
+                // communication
+                addPeerCertificateToTrustStore(simpleUser, trustStoreFile, password);
+        }
+
+        return allUsers;
     }
 }

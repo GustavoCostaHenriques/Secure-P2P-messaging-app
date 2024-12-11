@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.io.FileOutputStream;
 
 import java.security.Key;
@@ -24,11 +25,14 @@ import java.security.cert.Certificate;
 import javax.security.auth.x500.X500Principal;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Date;
 import java.util.HashMap;
 
+import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -65,10 +69,12 @@ public class Server {
     private final static int port = 2222; // Port on which the server listens for peer connections
     private static SSLServerSocket serverSocket; // SSLServerSocket to accept secure connections
     private static List<User> userList = new ArrayList<>(); // List to store connected users
-    private static User serverUser = new User("SERVER", "localhost", 2222, null, null, null); // Represents the central
-                                                                                              // server
-    private static User userNull = new User("NULL", "NULL", 0000, null, null, null); // Placeholder user if peer not
-                                                                                     // found
+    private static User serverUser = new User("SERVER", "localhost", 2222, null, null, null, null); // Represents the
+                                                                                                    // central
+    // server
+    private static User userNull = new User("NULL", "NULL", 0000, null, null, null, null); // Placeholder user if peer
+                                                                                           // not
+    // found
     private static Map<String, Key> groupKeys = new HashMap<>(); // Map to store groups (interests) and their encryption
                                                                  // keys
     // List of interests (groups)
@@ -173,8 +179,64 @@ public class Server {
      */
     private static Key generateGroupKey() throws NoSuchAlgorithmException {
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-        keyGen.init(256); // Key size (128, 192, or 256 bits, depending on system support)
+        keyGen.init(256); // Key size
         return keyGen.generateKey();
+    }
+
+    /**
+     * Returns a default key that cannot decrypt any messages.
+     * This is achieved by returning the identity element (zero) of the G1 group.
+     *
+     * @return A Key representing a default key that cannot
+     *         decrypt anything.
+     */
+    private static Key getDefaultKey() {
+        Key TODO = null;
+        return TODO;
+    }
+
+    /**
+     * Derives a combined key for the user based on their interests.
+     * This key is used for ABE encryption and represents the user's attributes.
+     *
+     * @param interests The interests (or attributes) of the user.
+     * @return The derived key for the user based on their interests.
+     */
+    private static Key deriveCombinedKey(List<String> interests) {
+        Key TODO = null;
+        return TODO;
+    }
+
+    /**
+     * Encrypts a field name (group name) using the group's base encryption key.
+     *
+     * @param fieldName The name of the group (field name) to encrypt.
+     * @return The encrypted field name as a Base64-encoded string, or null if
+     *         encryption fails.
+     */
+    public static String encryptFieldName(String fieldName) {
+        try {
+            // Obtain the key associated with the group
+            Key groupKey = groupKeys.get(fieldName);
+
+            if (groupKey == null) {
+                throw new IllegalArgumentException("No encryption key found for group: " + fieldName);
+            }
+
+            // Initialize AES cipher for encryption
+            Cipher cipher = Cipher.getInstance("AES");
+            cipher.init(Cipher.ENCRYPT_MODE, groupKey);
+
+            // Encrypt the field name
+            byte[] encryptedBytes = cipher.doFinal(fieldName.getBytes(StandardCharsets.UTF_8));
+
+            // Encode the encrypted bytes as a Base64 string
+            return Base64.getEncoder().encodeToString(encryptedBytes);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -432,9 +494,31 @@ public class Server {
 
             X509Certificate peerCertificate = user.getCertificate(); // Retrieve the certificate from the User object
 
+            // If port equals -1 treat it request to know all the users
+            if (user.getPort() == -1) {
+                needsTosend = true;
+
+                message = new Message(serverUser, null, null, false, null); // Prepare a response message to send to the
+                                                                            // user
+
+                List<User> filteredUserList = userList.stream()
+                        .filter(u -> !u.getId().equals(user.getId()))
+                        .collect(Collectors.toList());
+                message.setAllUsers(filteredUserList);
+            }
+            // If port equals -2 treat it request to send the groupName of the user
+            // encrypted
+            else if (user.getPort() == -2) {
+                needsTosend = true;
+
+                String fieldName = user.getGroupName();
+                String fieldNameEncrypted = encryptFieldName(fieldName);
+                message = new Message(serverUser, null, fieldNameEncrypted, false, null); // Prepare a response message
+                                                                                          // to send to the user
+            }
             // Check if it's a connection request with user IP and port specified but no
             // receiver ID
-            if (user.getIp() != null && user.getPort() != 0000 && user.getReceiverId() == null) {
+            else if (user.getIp() != null && user.getPort() != 0000 && user.getReceiverId() == null) {
                 needsTosend = true;
                 userList.add(user); // Add user to the connected users list
                 String peerAlias = "peer-" + user.getId();
@@ -446,25 +530,30 @@ public class Server {
                     e.printStackTrace(); // Log any issues during the TrustStore update
                 }
 
-                Map<String, Key> filteredGroupKeys = new HashMap<>();
+                Key combinedKey = null;
                 if (user.getInterests() != null) {
-                    for (String interest : user.getInterests()) {
-                        if (groupKeys.containsKey(interest)) {
-                            filteredGroupKeys.put(interest, groupKeys.get(interest));
-                        }
+                    // Derive a single key for the user's interests
+                    try {
+                        combinedKey = deriveCombinedKey(user.getInterests());
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
 
-                message = new Message(serverUser, user, null);
-                message.setGroupKeys(filteredGroupKeys);
+                message = new Message(serverUser, user, null, false, null);
+                if (combinedKey == null)
+                    message.setGroupKeys(getDefaultKey());
+                else
+                    message.setGroupKeys(combinedKey);
             }
             // Check if it's a request to locate another user by ID (receiver ID specified,
             // no IP or port)
             else if (user.getIp() == null && user.getPort() == 0000 && user.getReceiverId() != null) {
                 needsTosend = true; // Flag as needing to send a response message
                 User foundUser = findUserById(user.getReceiverId()); // Look up the requested user in userList
-                message = new Message(serverUser, foundUser, null); // Prepare a response message to send to the
-                                                                    // user
+                message = new Message(serverUser, foundUser, null, false, null); // Prepare a response message to send
+                                                                                 // to the
+                // user
             }
             // Check if it's a request to get keys for the user interests (receiver ID and
             // IP specified,
@@ -472,17 +561,22 @@ public class Server {
             else if (user.getIp() != null && user.getPort() == 0000 && user.getReceiverId() == null) {
                 needsTosend = true; // Flag as needing to send a response message
 
-                Map<String, Key> filteredGroupKeys = new HashMap<>();
+                Key combinedKey = null;
                 if (user.getInterests() != null) {
-                    for (String interest : user.getInterests()) {
-                        if (groupKeys.containsKey(interest)) {
-                            filteredGroupKeys.put(interest, groupKeys.get(interest));
-                        }
+                    // Derive a single key for the user's interests
+                    try {
+                        combinedKey = deriveCombinedKey(user.getInterests());
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
 
-                message = new Message(serverUser, null, null); // Prepare a response message to send to the user
-                message.setGroupKeys(filteredGroupKeys);
+                message = new Message(serverUser, null, null, false, null); // Prepare a response message to send to the
+                                                                            // user
+                if (combinedKey == null)
+                    message.setGroupKeys(getDefaultKey());
+                else
+                    message.setGroupKeys(combinedKey);
             }
             // If IP, port, and receiver ID are all null, treat it as a user disconnect
             // request

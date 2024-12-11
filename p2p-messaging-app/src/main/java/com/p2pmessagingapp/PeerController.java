@@ -179,7 +179,7 @@ public class PeerController {
                 return "your own name"; // Prevent user from initiating chat with themselves
             User userExists = null;
             try {
-                userExists = peer.checkscommunication(contactName); // Check if contact exists
+                userExists = peer.checkscommunication(contactName, false); // Check if contact exists
             } catch (Exception e) {
             }
             // Wait until contact status is determined
@@ -190,7 +190,7 @@ public class PeerController {
                     e.printStackTrace();
                 }
             }
-            if (!userExists.getId().equals("NULL"))
+            if (!userExists.getId().equals("NULL") && (!userExists.getId().equals(peerId)))
                 return "exists"; // Contact found
             else
                 return "not found"; // Contact not found
@@ -225,6 +225,34 @@ public class PeerController {
     }
 
     /**
+     * Loads the chat history of a group.
+     * 
+     * @param peerId    The ID of the peer requesting the chat history.
+     * @param groupName The name of the field whose chat history is requested.
+     * @return A list of messages between all the peers in this group.
+     */
+    @GetMapping("/loadGroupChat")
+    @ResponseBody
+    public List<String> loadGroupChat(@RequestParam("peerId") String peerId,
+            @RequestParam("groupName") String groupName) {
+        Peer peer = peerMap.get(peerId);
+        List<String> messagesToString = new ArrayList<>();
+        if (peer != null) {
+            List<Message> messages = peer.getMessageGroupHistory();
+
+            for (Message message : messages) {
+                if (message.getFieldName().equals(groupName)) {
+                    String messageToString = message.getTime() + "-" + "[" + message.getSender().getId() + "] "
+                            + message.getContent();
+                    messagesToString.add(messageToString);
+                }
+            }
+        }
+
+        return messagesToString; // Return the list of messages
+    }
+
+    /**
      * Sends a message to a specified contact if they are available.
      * 
      * @param peerId      The ID of the peer sending the message.
@@ -241,7 +269,7 @@ public class PeerController {
         Peer peer = peerMap.get(peerId);
         User receiver = null;
         try {
-            receiver = peer.checkscommunication(contactName); // Check if receiver is available
+            receiver = peer.checkscommunication(contactName, true); // Check if receiver is available
         } catch (Exception e) {
         }
         // Wait until the receiver's status is known
@@ -261,6 +289,63 @@ public class PeerController {
     }
 
     /**
+     * Sends a message to a specified contact if they are available.
+     * 
+     * @param peerId       The ID of the peer sending the message.
+     * @param searchMessga The message content that is going to be searched.
+     * @return A list of the messages found.
+     */
+    @PostMapping("/searchMessage")
+    @ResponseBody
+    public List<String> searchMessage(@RequestParam("peerId") String peerId,
+            @RequestParam("searchMessage") String searchMessage) {
+        Peer peer = peerMap.get(peerId);
+        List<Message> messagesFound = null;
+        List<String> messagesToString = new ArrayList<>();
+        messagesFound = peer.searchMessage(searchMessage, "CHATS/" + peerId);
+
+        for (Message message : messagesFound) {
+            String messageToString = message.getTime() + "-" + "[" + message.getSender().getId() + ","
+                    + message.getFieldName() + "] " + message.getContent();
+            messagesToString.add(messageToString);
+        }
+
+        return messagesToString;
+    }
+
+    /**
+     * Sends a message to a specified contact if they are available.
+     * 
+     * @param peerId    The ID of the peer sending the message.
+     * @param groupName The name of the group to receive the message.
+     * @param message   The message content.
+     * @return A status message indicating success or failure in sending the
+     *         message.
+     */
+    @PostMapping("/sendGroupMessage")
+    @ResponseBody
+    public String sendGroupMessage(@RequestParam("peerId") String peerId,
+            @RequestParam("groupName") String groupName,
+            @RequestParam("message") String message) throws InterruptedException {
+        Peer peer = peerMap.get(peerId);
+        List<User> allUsers = null;
+        try {
+            allUsers = peer.getAllUsers();
+        } catch (Exception e) {
+        }
+        // Wait until the receiver's status is known
+        while (allUsers == null) {
+            try {
+                Thread.sleep(1000); // Wait 1 second before retrying
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        peer.broadcast(message, groupName); // Send the message to all the users
+        return "success"; // Return success status
+    }
+
+    /**
      * Changes interests of the peer.
      * 
      * @param peerId The ID of the peer to be changed.
@@ -276,9 +361,8 @@ public class PeerController {
         List<String> topics = topicsMap.get("topics");
         if (topics.size() == 0)
             topics = null;
-        if (peer != null) {
+        if (peer != null)
             peer.setInterests(topics);
-        }
 
         return "success";
     }

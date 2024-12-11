@@ -3,7 +3,8 @@ package com.p2pmessagingapp;
 import java.io.Serializable;
 import java.security.Key;
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * The Message class represents a message being sent between users in the P2P
@@ -19,8 +20,13 @@ public class Message implements Serializable {
     private final User sender; // The user who is sending the message
     private final User receiver; // The user who is receiving the message
     private final String content; // The content of the message
-    private final String time; // The time when the message was sent
-    private Map<String, Key> groupKeys;
+    private String time; // The time when the message was sent
+    private Key groupKey; // key of the interest that the receiver is going to have
+    private List<User> allUsers; // list of all the users that exist (this value only exist in a message where
+                                 // the server is sending all the users to a certain peer so that the peer can
+                                 // broadcast a message in a group chat)
+    private final boolean broadcastMsg; // boolean to check if this message is a broadcast or not
+    private final String fieldName; // Name of the field that the message (in case it is a broadcast message)
 
     /**
      * Constructs a Message instance with a sender, receiver, and content.
@@ -29,12 +35,15 @@ public class Message implements Serializable {
      * @param receiver The user receiving the message.
      * @param content  The content of the message.
      */
-    public Message(User sender, User receiver, String content) {
+    public Message(User sender, User receiver, String content, boolean broadcastMsg, String fieldName) {
         LocalDateTime timeStap = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("ddMMyy-HH:mm:ss");
         this.sender = sender;
         this.receiver = receiver;
         this.content = content;
-        this.time = timeStap.toString();
+        this.broadcastMsg = broadcastMsg;
+        this.fieldName = fieldName;
+        this.time = timeStap.format(formatter);
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -78,20 +87,71 @@ public class Message implements Serializable {
     }
 
     /**
+     * Sets time
+     * 
+     */
+    public void setTime(String time) {
+        this.time = time;
+    }
+
+    /**
      * Gets group keys
      * 
      * @return groupKeys
      */
-    public Map<String, Key> getGroupKeys() {
-        return groupKeys;
+    public Key getGroupKey() {
+        return groupKey;
     }
 
     /**
      * Sets the group keys to the argument given
      * 
-     * @param groupKeys group keys to store
+     * @param groupKey group key to store
      */
-    public void setGroupKeys(Map<String, Key> groupKeys) {
-        this.groupKeys = groupKeys;
+    public void setGroupKeys(Key groupKey) {
+        this.groupKey = groupKey;
+    }
+
+    /**
+     * Gets the list of all the Users
+     * 
+     * @return allUsers
+     */
+    public List<User> getAllUsers() {
+        return allUsers;
+    }
+
+    /**
+     * Sets the list of all the users to the argument given
+     * 
+     * @param allUsers list of all the users to store
+     */
+    public void setAllUsers(List<User> allUsers) {
+        this.allUsers = allUsers;
+    }
+
+    /**
+     * Gets the boolean broadcastMsg of the message.
+     *
+     * @return The boolean broadcastMsg of the message.
+     */
+    public boolean getBroadcastMsg() {
+        return broadcastMsg;
+    }
+
+    /**
+     * Gets the fieldName of the message.
+     *
+     * @return The fieldName of the message.
+     */
+    public String getFieldName() {
+        return fieldName;
+    }
+
+    public boolean equals(Message msg) {
+        return (msg.getSender().getId().equals(this.sender.getId()))
+                && (msg.getReceiver().getId().equals(this.receiver.getId()))
+                && (msg.getContent().equals(this.content))
+                && (msg.getTime().equals(this.time));
     }
 }
