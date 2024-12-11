@@ -1,0 +1,31 @@
+First step: Installing the CloudCrypto.jar!
+
+->Please insert the following command in your terminal:
+
+mvn install:install-file -Dfile="path\p2p-messaging-app\CloudCrypto.jar" -DgroupId="cn.edu.buaa" -DartifactId="cloudcrypto-abe" -Dversion="1.0" -Dpackaging="jar"
+mvn install:install-file -Dfile="path\p2p-messaging-app\jpbc-api-2.0.0.jar" -DgroupId="it.unisa.dia.gas" -DartifactId="jpbc" -Dversion="2.0.0" -Dpackaging="jar"
+mvn install:install-file -Dfile="path\p2p-messaging-app\jpbc-crypto-2.0.0.jar" -DgroupId="it.unisa.dia.gas" -DartifactId="jpbc-crypto" -Dversion="2.0.0" -Dpackaging="jar"
+mvn install:install-file -Dfile="path\p2p-messaging-app\jpbc-plaf-2.0.0.jar" -DgroupId="it.unisa.dia.gas" -DartifactId="jpbc-plaf" -Dversion="2.0.0" -Dpackaging="jar"
+
+Where path is the your path to this directory
+
+Second Step:
+
+-> After install the CloudCrypto.jar now we can rode the code. Please do the following command on your terminal:
+
+mvn spring-boot:run
+
+Third Step:
+
+-> To see the app go to your browser and copy this URL:
+
+http://localhost:8080/
+
+Optional:
+
+For testing purposes if you want to clear the data from a specific user that exists in the cloud do the following command on your termianl:
+
+mvn spring-boot:run -D"spring-boot.run.arguments=CLEAR_<userId>"
+
+Where <userId> is the user that you want to clear.
+
