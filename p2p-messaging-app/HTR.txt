@@ -1,0 +1,20 @@
+First step: 
+
+-> Please do the following command on your terminal:
+
+mvn spring-boot:run
+
+Second Step:
+
+-> To see the app go to your browser and copy this URL:
+
+http://localhost:8080/
+
+Optional:
+
+-> For testing purposes if you want to clear the data from a specific user that exists in the cloud do the following command on your terminal:
+
+mvn spring-boot:run -D"spring-boot.run.arguments=CLEAR_<userId>"
+
+Where <userId> is the user that you want to clear.
+
