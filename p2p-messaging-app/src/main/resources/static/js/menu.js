@@ -47,24 +47,11 @@ function toggleAddContactDropdown() {
     }
 }
 
-function toggleInterestsList() {
-    var interestsList = document.getElementById("interestsList");
-    var toggleButton = document.getElementById("toggleInterestsButton");
-
-    if (interestsList.style.display === "none" || interestsList.style.display === "") {
-        interestsList.style.display = "block";
-        toggleButton.textContent = "Hide Interests";
-    } else {
-        interestsList.style.display = "none";
-        toggleButton.textContent = "Show Interests";
-    }
-}
-
 function toggleSearchContainer() {
     var searchContainer = document.getElementById('search-container');
     var userDropdown = document.getElementById('userDropdown');
     var addContactDropdown = document.getElementById('addContactDropdown');
-    var dropdownMenu = document.getElementById("dropdown_interests-menu");
+    var searchMessageInput = document.getElementById('searchMessage');
 
     if (userDropdown.style.display === 'block') {
         userDropdown.style.display = 'none';
@@ -72,100 +59,18 @@ function toggleSearchContainer() {
     if (addContactDropdown.style.display === 'block') {
         addContactDropdown.style.display = 'none';
     }
-    if (dropdownMenu.style.display === 'block') {
-        dropdownMenu.style.display = 'none';
-    }
 
     if (searchContainer.style.display === 'none' || searchContainer.style.display === '') {
         searchContainer.style.display = 'block';
+        if (searchMessageInput) {
+            searchMessageInput.value = '';
+        }
+
+        const searchMessages = document.querySelectorAll('.Searchmessage.individual-message');
+        searchMessages.forEach(message => message.remove());
     } else {
         searchContainer.style.display = 'none';
     }
-}
-
-function saveChanges() {
-    var urlParams = new URLSearchParams(window.location.search);
-    var peerId = urlParams.get('peerId');
-
-    var selectedTopics = [];
-    document.querySelectorAll('#dropdown_interests-menu input[type="checkbox"]:checked').forEach(checkbox => {
-        selectedTopics.push(checkbox.value);
-    });
-
-    if (selectedTopics.length === 0) {
-        fetch('/saveChanges?peerId=' + peerId, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ topics: [] })
-        })
-        .then(response => {
-            if (response.ok) {
-                const noInterestsMessage = document.getElementById('noInterestsMessage');
-                const interestsContainer = document.getElementById('interestsContainer');
-                const interestsList = document.getElementById('interestsList');
-                interestsList.innerHTML = ""; 
-    
-                if (selectedTopics.length > 0) {
-                    if (noInterestsMessage) noInterestsMessage.style.display = "none";
-                    interestsContainer.style.display = "block";
-                    selectedTopics.forEach(topic => {
-                        const li = document.createElement('li');
-                        li.textContent = topic;
-                        interestsList.appendChild(li);
-                    });
-                } else {
-                    if (noInterestsMessage) noInterestsMessage.style.display = "none";
-                    interestsContainer.style.display = "none";
-                }
-    
-                toggleDropdown_interests();
-                toggleDropdown();
-                window.location.href = `/menu?peerId=${peerId}`
-            } else {
-                console.error("Failed to update interests.");
-            }
-        })
-        .catch(error => console.error("Error:", error));
-        return;
-    }
-
-    fetch('/saveChanges?peerId=' + peerId, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ topics: selectedTopics })
-    })
-    .then(response => {
-        if (response.ok) {
-            const noInterestsMessage = document.getElementById('noInterestsMessage');
-            const interestsContainer = document.getElementById('interestsContainer');
-            const interestsList = document.getElementById('interestsList');
-            interestsList.innerHTML = ""; 
-
-            if (selectedTopics.length > 0) {
-                if (noInterestsMessage) noInterestsMessage.style.display = "none";
-                interestsContainer.style.display = "block";
-                selectedTopics.forEach(topic => {
-                    const li = document.createElement('li');
-                    li.textContent = topic;
-                    interestsList.appendChild(li);
-                });
-            } else {
-                if (noInterestsMessage) noInterestsMessage.style.display = "none";
-                interestsContainer.style.display = "none";
-            }
-
-            toggleDropdown_interests();
-            toggleDropdown();
-            window.location.href = `/menu?peerId=${peerId}`
-        } else {
-            console.error("Failed to update interests.");
-        }
-    })
-    .catch(error => console.error("Error:", error));
 }
 
 function logout() {
@@ -205,7 +110,6 @@ function startChat() {
         if (result === 'exists') {
             addConversation(contactName);
             addContactDropdown.style.display = 'none';
-            showChats();
         } else if (result === 'not found') {
             document.getElementById('errorMessage1').style.display = 'none';
             document.getElementById('errorMessage').style.display = 'block';
@@ -275,27 +179,6 @@ function selectConversation(element) {
     startPollingForMessages(peerId, contactName);
 }
 
-function selectGroupConversation(element) {
-    document.querySelectorAll('.conversation-container').forEach(conversation => {
-        conversation.classList.remove('active');
-    });
-
-    element.classList.add('active');
-    const group = element.getAttribute("data-group");
-
-    // Get peerId and contactName
-    var urlParams = new URLSearchParams(window.location.search);
-    var peerId = urlParams.get('peerId');;
-    var groupName = element.getAttribute("data-group");
-
-    toggleChatPanel();
-
-    // Load chat messages
-    loadGroupMessages(peerId, groupName);
-
-    startPollingForGroupMessages(peerId, groupName);
-}
-
 function toggleChatPanel() {
     const chatPanel = document.getElementById('chatPanel');
     const chatActivePanel = document.getElementById('chatActivePanel');
@@ -309,47 +192,6 @@ function toggleChatPanel() {
         chatPanel.style.display = 'flex';
         chatActivePanel.style.display = 'none';
     }
-}
-
-function loadGroupMessages(peerId, groupName) {
-    const chatMessagesContainer = document.querySelector('.chat-messages');
-    chatMessagesContainer.innerHTML = ''; // Clear existing messages
-
-    fetch(`/loadGroupChat?peerId=${peerId}&groupName=${groupName}`)
-        .then(response => response.json())
-        .then(messages => {
-            messages.forEach(message => {
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('message');
-
-                const [timestampAndSender, messageContent] = message.split('] ');
-                const [fullTimestamp, sender] = timestampAndSender.split('-[');
-                const senderId = sender.replace('[', '').replace(']', '');
-
-                if (senderId === peerId) {
-                    // Message sent from this user
-                    messageElement.classList.add('sent');
-                    messageElement.innerHTML = `
-                        <p>${messageContent}</p>
-                        <span class="timestamp">${fullTimestamp}</span>
-                    `;
-                } else {
-                    // Message received from another peer
-                    messageElement.classList.add('received');
-                    messageElement.innerHTML = `
-                        <span class="sender">${senderId}</span>
-                        <p>${messageContent}</p>
-                        <span class="timestamp">${fullTimestamp}</span>
-                    `;
-                }
-
-                chatMessagesContainer.appendChild(messageElement);
-            });
-            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-        })
-        .catch(error => {
-            console.error('Error loading messages:', error);
-        });
 }
 
 function loadChatMessages(peerId, contactName) {
@@ -401,49 +243,27 @@ function sendMessage() {
     if (message) {
         const activeConversation = document.querySelector('.conversation-container.active');
         const contactName = activeConversation.getAttribute("data-contact");
-        const groupName = activeConversation.getAttribute("data-group");
 
-        if(contactName) {
-            var urlParams = new URLSearchParams(window.location.search);
-            var peerId = urlParams.get('peerId');
-            // Clear the input field after sending
-            fetch('/sendMessage?peerId=' + peerId + '&contactName=' + contactName + '&message=' + message, {
-                method: 'POST',
-            })
-            .then(response => response.text())
-            .then(result => {
-                if (result === 'success') {
-                    loadChatMessages(peerId,contactName);
-                } else if (result === 'not found') {
-                    document.getElementById('errorMessage2').style.display = 'block';
-                }
-                else {
-                    console.error('An error occurred.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        } else if(groupName) {
-            var urlParams = new URLSearchParams(window.location.search);
-            var peerId = urlParams.get('peerId');
-            // Clear the input field after sending
-            fetch('/sendGroupMessage?peerId=' + peerId + '&groupName=' + groupName + '&message=' + message, {
-                method: 'POST',
-            })
-            .then(response => response.text())
-            .then(result => {
-                if (result === 'success') {
-                    loadGroupMessages(peerId,groupName);
-                } else {
-                    console.error('An error occurred.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        }
-
+        var urlParams = new URLSearchParams(window.location.search);
+        var peerId = urlParams.get('peerId');
+        // Clear the input field after sending
+        fetch('/sendMessage?peerId=' + peerId + '&contactName=' + contactName + '&message=' + message, {
+            method: 'POST',
+        })
+        .then(response => response.text())
+        .then(result => {
+            if (result === 'success') {
+                loadChatMessages(peerId,contactName);
+            } else if (result === 'not found') {
+                document.getElementById('errorMessage2').style.display = 'block';
+            }
+            else {
+                console.error('An error occurred.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 
         messageInput.value = '';
     }
@@ -453,53 +273,6 @@ function startPollingForMessages(peerId, contactName) {
     setInterval(() => {
         loadChatMessages(peerId, contactName);
     }, 5000); 
-}
-
-function startPollingForGroupMessages(peerId, contactName) {
-    setInterval(() => {
-        loadGroupMessages(peerId, contactName);
-    }, 5000); 
-}
-
-function toggleDropdown_interests() {
-    var dropdownMenu = document.getElementById("dropdown_interests-menu");
-    if (dropdownMenu.style.display === "none" || dropdownMenu.style.display === "") {
-        dropdownMenu.style.display = "block";
-    } else {
-        dropdownMenu.style.display = "none";
-    }
-}
-
-function saveActiveTab(tabName) {
-    localStorage.setItem('activeTab', tabName);
-}
-
-// Função para restaurar o tab ativo com base no localStorage
-function restoreActiveTab() {
-    const activeTab = localStorage.getItem('activeTab') || 'chats'; // Default para 'chats' se não existir
-    if (activeTab === 'groups') {
-        showGroups(); // Ativa o tab 'Groups'
-    } else {
-        showChats(); // Ativa o tab 'Chats'
-    }
-}
-
-function showChats() {
-    document.getElementById('chatsTab').classList.add('active');
-    document.getElementById('groupsTab').classList.remove('active');
-    document.getElementById('chatsList').style.display = 'block';
-    document.getElementById('groupsList').style.display = 'none';
-
-    saveActiveTab('chats');
-}
-
-function showGroups() {
-    document.getElementById('groupsTab').classList.add('active');
-    document.getElementById('chatsTab').classList.remove('active');
-    document.getElementById('chatsList').style.display = 'none';
-    document.getElementById('groupsList').style.display = 'block';
-
-    saveActiveTab('groups');
 }
 
 function getLocalStorageKey() {
@@ -512,7 +285,6 @@ function updateStoredConversations(contactName) {
     const storageKey = getLocalStorageKey();
     const storedConversations = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
-    // Adiciona a conversa apenas se ainda não existir
     if (!storedConversations.includes(contactName)) {
         storedConversations.push(contactName);
         localStorage.setItem(storageKey, JSON.stringify(storedConversations));
@@ -524,10 +296,8 @@ function restoreConversations() {
     const storedConversations = JSON.parse(localStorage.getItem(storageKey) || '[]');
     const conversationList = document.querySelector('.conversation-list');
 
-    // Limpa a lista de conversas existentes no DOM
     conversationList.innerHTML = '';
 
-    // Recria cada conversa armazenada
     storedConversations.forEach(contactName => {
         var newConversation = document.createElement('li');
         newConversation.classList.add('conversation-container');
@@ -543,19 +313,8 @@ function restoreConversations() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    restoreActiveTab(); 
     restoreConversations();
 });
-
-window.addEventListener("click", function(event) {
-    var dropdownButton = document.querySelector(".dropdown_interests-button");
-    var dropdownMenu = document.getElementById("dropdown_interests-menu");
-
-    if (!dropdownButton.contains(event.target) && !dropdownMenu.contains(event.target)) {
-        dropdownMenu.style.display = "none";
-    }
-});
-
 function clearUserConversations() {
     const storageKey = getLocalStorageKey();
     localStorage.removeItem(storageKey);
@@ -581,30 +340,30 @@ function searchMessage() {
 
                 const [timestampAndSender, messageContent] = message.split('] ');
                 const [fullTimestamp, sender] = timestampAndSender.split('-[');
-                const senderIdAndGroupName = sender.replace('[', '').replace(']', '');
-                var [senderId, fieldName] = senderIdAndGroupName.split(',');
+                const senderandreceiverId = sender.replace('[', '').replace(']', '');
+                var [senderId, receiverId] = senderandreceiverId.split(',');
+
                 
                 if(senderId == peerId) {
                     senderId = "Myself";
                 }
 
-                if (!fieldName || fieldName == "null") {
-                    // Message found in an individual conversation
+                if(senderId != "Myself") {
                     messageElement.classList.add('individual-message'); 
                     messageElement.innerHTML = `
-                        <span>${senderId}</span>
+                        <span><strong>${senderId}</strong></span>
                         <p>${messageContent}</p>
                         <span class="timestamp">${fullTimestamp}</span>
                     `;
                 } else {
-                    // Message found in a group
-                    messageElement.classList.add('group-message'); 
+                    messageElement.classList.add('individual-message'); 
                     messageElement.innerHTML = `
-                        <p>${senderId} | ${fieldName}</p>
+                        <span><strong>${senderId}</strong> to <strong>${receiverId}</strong></span>
                         <p>${messageContent}</p>
                         <span class="timestamp">${fullTimestamp}</span>
                     `;
                 }
+
 
                 searchMessagesContainer.appendChild(messageElement);
             });
@@ -617,19 +376,30 @@ function searchMessage() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    var userInterests = document.getElementById("interestsList");
-    var interestsContainer = document.getElementById("interestsContainer");
-    var noInterestsMessage = document.getElementById("noInterestsMessage");
+function populateContacts(contacts) {
+    var conversationList = document.querySelector('.conversation-list');    
 
-    if (userInterests && userInterests.childElementCount > 0) {
-        interestsContainer.style.display = "block"; 
-        if (noInterestsMessage) noInterestsMessage.style.display = "none";  
-    } else {
-        interestsContainer.style.display = "none";  
-        if (noInterestsMessage) noInterestsMessage.style.display = "block"; 
-    }
-});
+    conversationList.innerHTML = '';
+
+    contacts.forEach(function(contactName) {
+        var newConversation = document.createElement('li');
+        newConversation.classList.add('conversation-container');
+        newConversation.setAttribute('data-contact', contactName);
+        newConversation.innerHTML = '<img src="/images/user.png">' + contactName;
+
+        newConversation.onclick = function() {
+            selectConversation(newConversation);
+        };
+
+        conversationList.appendChild(newConversation);
+        updateStoredConversations(contactName);
+
+        conversationList.style.display = 'none'; 
+        conversationList.offsetHeight; 
+        conversationList.style.display = 'block'; 
+    });
+
+}
 
 // Initial check on page load
 document.addEventListener('DOMContentLoaded', toggleChatPanel);
