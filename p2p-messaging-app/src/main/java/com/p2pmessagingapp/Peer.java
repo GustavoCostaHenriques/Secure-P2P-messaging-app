@@ -14,6 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.math.BigInteger;
@@ -67,12 +68,9 @@ public class Peer {
     private SSLSocket sslSocket; // SSL socket for secure communication
     private SSLSocket sslServerSocket; // SSL server socket for communication with server
     private String[] values = new String[3]; // Array to hold user input values (ID, port and IP)
-    private List<String> interests = new ArrayList<>(); // List of interests
     private final List<Message> messageHistory = new CopyOnWriteArrayList<>(); // List to store all individual messages
                                                                                // for this
                                                                                // peer
-    private final List<Message> messageGroupHistory = new CopyOnWriteArrayList<>(); // List to store all group messages
-                                                                                    // for this
     // peer
     private PeerServer serverThread; // Thread for the peer server
     private boolean verificationStatus = true; // Boolean that checks the values of this peer
@@ -91,8 +89,6 @@ public class Peer {
                                                                    // reconstruct.
     private volatile User userFound; // Using 'volatile' on serverResponse to ensure visibility across threads and
                                      // prevent infinite loop due to caching issues,
-    private Key groupKey;
-    private List<User> allUsers;
     // Variables that will store the paths for the keystore, truststore and server
     // certificate.
     private String keyStoreFile;
@@ -101,14 +97,6 @@ public class Peer {
     private String password; // Password of this user, to manage the security of keystore and truststore.
     private X509Certificate cert; // Certificate of this user.
 
-    private final String[] interestsDefault = { // All the existing interests.
-            "Technology", "Sports and Fitness", "Travel", "Music", "Movies and TV",
-            "Reading and Literature", "Health and Wellness", "Food and Cooking", "Nature and Sustainability",
-            "Art and Culture", "Science and Innovation", "History", "Animals and Pets", "Personal Development",
-            "Gaming and Entertainment", "Fashion and Style", "Politics and Society", "Photography",
-            "Spirituality and Meditation", "Education and Learning"
-    };
-
     /**
      * Starts the peer, setting up necessary SSL configuration and launching the
      * server.
@@ -116,22 +104,13 @@ public class Peer {
      * @param args Arguments received from the submissionForm in the PeerController.
      * @throws Exception If an error occurs during initialization or communication.
      */
-    public void startPeer(String[] args, List<String> interests) throws Exception {
+    public void startPeer(String[] args) throws Exception {
         // Adds a shutdown hook to delete client and port files/directories upon exiting
         addShutdownHook(this); // Triggered by pressing 'Control + C'
 
         // Store user values (ID, IP, port) in the values array
         for (int i = 0; i < 3; i++) {
             this.values[i] = args[i];
-        }
-        this.interests = interests;
-
-        for (String interest : this.interestsDefault) {
-            if (this.values[0].equals(interest)) {
-                setVerificationStatus(this, false); // Mark verification as failed
-                setRepeatedId(this, true); // Indicate duplicate ID found (in this case on ID is duplicate but the user
-                                           // can't have the name of an interest)
-            }
         }
 
         // Define paths and passwords for KeyStore and TrustStore files
@@ -156,7 +135,7 @@ public class Peer {
         addServerCertToPeerTrustStore(trustStoreFile, password, serverCertFile);
 
         // Create a User object with peer's details (for later communication)
-        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests, null);
+        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert);
 
         // Add peer's own certificate to TrustStore for secure, mutual authentication
         addPeerCertificateToTrustStore(user, trustStoreFile, password);
@@ -193,19 +172,14 @@ public class Peer {
                 List<Message> messagesFound = this.searchMessage("NULL", objectKey);
 
                 for (Message message : messagesFound) {
-                    if (message.getBroadcastMsg())
-                        this.addMessageGroupToHistory(message);
-                    else
-                        this.addMessageToHistory(message);
+                    this.addMessageToHistory(message);
                 }
             }
 
             // Keep the program running indefinitely
             keepProgramRunning();
         } else {
-            // If verification failed, close the server socket if created
-            if (serverThread.getServerCreated())
-                serverThread.closeServerSocket();
+            this.killClient(this);
         }
     }
 
@@ -219,7 +193,7 @@ public class Peer {
      * @param sender The User object representing the sender creating this peer.
      * @throws Exception If an error occurs during initialization.
      */
-    public Peer(String id, String ip, int port, List<String> interests, User sender) throws Exception {
+    public Peer(String id, String ip, int port, User sender) throws Exception {
         // Initialize the peer's basic details
         this.values[0] = id;
         this.values[1] = String.valueOf(port);
@@ -235,7 +209,7 @@ public class Peer {
         addPeerCertificateToTrustStore(sender, trustStoreFile, password);
 
         // Create a User instance for this peer with the given ID, IP, and port
-        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert, interests, null);
+        user = new User(this.values[0], this.values[2], Integer.parseInt(this.values[1]), null, cert);
 
         // Create an SSL socket for secure communication with the given IP and port
         this.sslSocket = createSSLSocket(ip, port, keyStoreFile, trustStoreFile, password);
@@ -269,7 +243,7 @@ public class Peer {
      */
     public User checkscommunication(String otherPeerID, boolean sendingMsg) throws Exception {
 
-        User receiverUser = new User(values[0], null, 0000, otherPeerID, null, null, null);
+        User receiverUser = new User(values[0], null, 0000, otherPeerID, null);
         sendMessageToServer(receiverUser);
 
         // Wait for the server response
@@ -290,34 +264,11 @@ public class Peer {
             for (Message message : messageHistory) {
                 if (message.getReceiver().getId().equals(otherPeerID)
                         || message.getSender().getId().equals(otherPeerID))
-                    userFound = new User(otherPeerID, null, 0000, null, null, null, null);
+                    userFound = new User(otherPeerID, null, 0000, null, null);
             }
         }
 
         return userFound;
-    }
-
-    /**
-     * Asks the user to encrypt the groupName with the appropriate key.
-     *
-     * @param groupName The name of the group that the server is going to encrypt.
-     * @return The groupName encrypted by the server in a string format.
-     */
-    public String askToEncryptGroupNameToServer(String groupName) throws InterruptedException {
-        User userToSend = new User(this.user.getId(), null, (-2), null, this.user.getCertificate(),
-                null, groupName);
-        sendMessageToServer(userToSend);
-
-        // Wait for the server response
-        String groupNameEncrypted = serverThread.getGroupNameEncrypted();
-        while (groupNameEncrypted == null) {
-            Thread.sleep(1000);
-            groupNameEncrypted = serverThread.getGroupNameEncrypted();
-        }
-
-        serverThread.setGroupNameEncrypted(null);
-
-        return groupNameEncrypted;
     }
 
     /**
@@ -329,7 +280,7 @@ public class Peer {
     public void communicate(User receiver, String content) {
 
         // Creates a message
-        Message message = new Message(user, receiver, content, false, null);
+        Message message = new Message(user, receiver, content);
 
         try {
 
@@ -343,39 +294,6 @@ public class Peer {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    /**
-     * Handles the broadcast of a message.
-     *
-     * @param content   The content of the message that is going to be sent.
-     * @param groupName The name of the group that the message is going to be
-     *                  broadcasted.
-     */
-    public void broadcast(String content, String groupName) throws InterruptedException {
-
-        // String encryptedContent = encryptMessageWithABE(content, this.interests);
-
-        for (User receiver : allUsers) {
-            // Creates a message
-            Message message = new Message(user, receiver, content, true, groupName);
-
-            try {
-
-                this.serverThread.sendMessage(message); // Send the message through the server thread
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        Message message = new Message(user, null, content, true, groupName);
-
-        // Add to the message history
-        addMessageGroupToHistory(message);
-
-        String objectKey = "CHATS/" + user.getId() + "/Send_" + groupName + "_" + message.getTime();
-
-        this.sendMessageToCloud(objectKey, content);
     }
 
     /**
@@ -600,6 +518,8 @@ public class Peer {
             // Create the SSL socket using the configured SSL context
             SSLSocketFactory factory = context.getSocketFactory();
             socket = (SSLSocket) factory.createSocket(ip, port);
+            String[] enabledCipherSuites = { "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" };
+            socket.setEnabledCipherSuites(enabledCipherSuites);
 
         } catch (IOException | NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException
                 | CertificateException | KeyManagementException e) {
@@ -607,51 +527,6 @@ public class Peer {
         }
         return socket;
     }
-
-    // -----------------------------------------------------------------------------------------------------------------------------//
-    // -------------------------------------------------------ABE-ECNRYPTION--------------------------------------------------------//
-    // -----------------------------------------------------------------------------------------------------------------------------//
-
-    /**
-     * Encrypts the message content using ABE based on the user's interests
-     * (attributes).
-     * This method would apply ABE encryption with a policy based on the user's
-     * interests.
-     *
-     * @param content   The message content to be encrypted.
-     * @param interests The interests (or attributes) of the user.
-     * @return The encrypted message content.
-     */
-    /*
-     * private String encryptMessageWithABE(String content, List<String> interests)
-     * {
-     * try {
-     * // Example ABE encryption logic:
-     * // 1. Generate the ABE policy based on the user's interests (attributes).
-     * String policy = generateABEPolicy(interests);
-     * 
-     * // 2. Encrypt the message using ABE. This involves creating a ciphertext with
-     * // the policy.
-     * PairingCipherSerParameter encryptedMessage = encryptWithABE(content, policy);
-     * 
-     * // Convert PairingCipherSerParameter to byte array using serialization
-     * try (ByteArrayOutputStream byteArrayOutputStream = new
-     * ByteArrayOutputStream();
-     * ObjectOutputStream objectOutputStream = new
-     * ObjectOutputStream(byteArrayOutputStream)) {
-     * objectOutputStream.writeObject(encryptedMessage);
-     * objectOutputStream.flush();
-     * byte[] byteArray = byteArrayOutputStream.toByteArray();
-     * 
-     * // Return the encrypted message as a Base64 string
-     * return Base64.getEncoder().encodeToString(byteArray);
-     * }
-     * } catch (Exception e) {
-     * e.printStackTrace();
-     * return null; // Handle the exception as needed
-     * }
-     * }
-     */
 
     // -----------------------------------------------------------------------------------------------------------------------------//
     // ------------------------------------------------------MESSAGE-SEARCHING------------------------------------------------------//
@@ -1112,13 +987,12 @@ public class Peer {
      * @throws IOException If an I/O error occurs during the killing operations.
      */
     public void killClient(Peer peer) throws IOException {
-        User user = new User(peer.values[0], null, 0000, null, null, null, null);
+        User user = new User(peer.values[0], null, 0000, null, null);
         sendMessageToServer(user);
-        peer.serverThread.closeServerSocket(); // Closes server socket
+        if (peer.serverThread.getServerCreated())
+            peer.serverThread.closeServerSocket(); // Closes server socket
         deleteSecureFiles(peer);
         clearMessageHistory();
-        clearMessageGroupHistory();
-        peer.interests = null;
     }
 
     /**
@@ -1204,7 +1078,7 @@ public class Peer {
      * @param id The ID of the user to find.
      */
     public void findReceiver(String id) {
-        User receiverUser = new User(this.user.getId(), null, 0000, id, null, null, null);
+        User receiverUser = new User(this.user.getId(), null, 0000, id, null);
         sendMessageToServer(receiverUser);
     }
 
@@ -1235,47 +1109,18 @@ public class Peer {
      */
     private Message buildMessage(String[] parts, String messageContent) {
 
-        boolean groupMessage = false;
         Message message = null;
 
-        if (parts.length == 3) { // Individual messages or messages sent in a group
-            String direction = parts[0];
-            String otherPeer = parts[1];
-            User otherUser = new User(otherPeer, null, 0, null, null, null, null);
-            String time = parts[2];
-            if (direction.equals("Send")) {
-                for (String interest : this.interestsDefault) {
-                    if (otherPeer.equals(interest)) { // this means that we found a group message sent by
-                                                      // this peer
-                        message = new Message(user, null, messageContent, true, otherPeer);
-                        message.setTime(time);
-                        groupMessage = true;
-                    }
-                }
-                if (!groupMessage) {
-                    message = new Message(user, otherUser, messageContent, false, null);
-                    message.setTime(time);
-                }
-
-            } else {
-                message = new Message(otherUser, user, messageContent, false, null);
-                message.setTime(time);
-            }
-        }
-
-        else if (parts.length == 4) { // Messages received in a group
-            String direction = parts[0];
-            String otherPeer = parts[1];
-            User otherUser = new User(otherPeer, null, 0, null, null, null, null);
-            String groupName = parts[2];
-            String time = parts[3];
-            if (direction.equals("Send")) {
-                message = new Message(user, otherUser, messageContent, true, groupName);
-                message.setTime(time);
-            } else {
-                message = new Message(otherUser, user, messageContent, true, groupName);
-                message.setTime(time);
-            }
+        String direction = parts[0];
+        String otherPeer = parts[1];
+        User otherUser = new User(otherPeer, null, 0, null, null);
+        String time = parts[2];
+        if (direction.equals("Send")) {
+            message = new Message(user, otherUser, messageContent);
+            message.setTime(time);
+        } else {
+            message = new Message(otherUser, user, messageContent);
+            message.setTime(time);
         }
 
         return message;
@@ -1286,7 +1131,15 @@ public class Peer {
     // -----------------------------------------------------------------------------------------------------------------------------//
 
     public List<Message> getMessageHistory() {
-        return new ArrayList<>(messageHistory); // Returns a copy to prevent external modifications
+        // Create a copy of the message history to prevent external modifications
+        List<Message> sortedMessages = new ArrayList<>(messageHistory);
+
+        // Sort the messages based on the time attribute
+        Collections.sort(sortedMessages, (m1, m2) -> {
+            return m1.getTime().compareTo(m2.getTime());
+        });
+
+        return sortedMessages;
     }
 
     public void clearMessageHistory() {
@@ -1300,19 +1153,8 @@ public class Peer {
     public List<Message> getMessagesByUser(String userId) {
         return messageHistory.stream()
                 .filter(msg -> msg.getSender().getId().equals(userId) || msg.getReceiver().getId().equals(userId))
+                .sorted((m1, m2) -> m1.getTime().compareTo(m2.getTime()))
                 .collect(Collectors.toList());
-    }
-
-    public List<Message> getMessageGroupHistory() {
-        return new ArrayList<>(messageGroupHistory); // Returns a copy to prevent external modifications
-    }
-
-    public void clearMessageGroupHistory() {
-        messageGroupHistory.clear();
-    }
-
-    public void addMessageGroupToHistory(Message message) {
-        messageGroupHistory.add(message);
     }
 
     // -----------------------------------------------------------------------------------------------------------------------------//
@@ -1326,28 +1168,6 @@ public class Peer {
      */
     public String[] getValues() {
         return values;
-    }
-
-    /**
-     * Gets the interests of the peer.
-     *
-     * @return The interests of the peer.
-     */
-    public List<String> getInterests() {
-        return interests;
-    }
-
-    /**
-     * Changes the interests of a User.
-     *
-     * @param interests The interests updated to change.
-     */
-    public void setInterests(List<String> interests) {
-        user.setInterests(interests);
-        this.interests = interests;
-        User userToSend = new User(this.user.getId(), this.user.getIp(), 0000, null, this.user.getCertificate(),
-                this.user.getInterests(), null);
-        sendMessageToServer(userToSend);
     }
 
     /**
@@ -1396,50 +1216,5 @@ public class Peer {
      */
     public static void setRepeatedPort(Peer peer, boolean bool) {
         peer.repeatedPort = bool;
-    }
-
-    /**
-     * Gets the groupKey of the peer.
-     *
-     * @return The groupKey of the peer.
-     */
-    public Key getGroupKey() {
-        return this.groupKey;
-    }
-
-    /**
-     * Sets the GroupKey of the peer.
-     */
-    public void setGroupKey(Peer peer, Key groupKey) {
-        peer.groupKey = groupKey;
-    }
-
-    /**
-     * Gets all the Users that exist.
-     *
-     * @return All users.
-     */
-    public List<User> getAllUsers() throws Exception {
-
-        User userToSend = new User(this.user.getId(), null, (-1), null, this.user.getCertificate(),
-                null, null);
-        sendMessageToServer(userToSend);
-
-        allUsers = serverThread.getAllUsers();
-        while (allUsers == null) {
-            allUsers = serverThread.getAllUsers();
-        }
-
-        serverThread.setAllUsers(null);
-
-        for (User simpleUser : allUsers) {
-            // If the user was found, add their certificate to this peer's TrustStore
-            if (!simpleUser.getId().equals("NULL") && simpleUser.getCertificate() != null)
-                // Add the certificate of the found peer to the TrustStore for secure
-                // communication
-                addPeerCertificateToTrustStore(simpleUser, trustStoreFile, password);
-        }
-
-        return allUsers;
     }
 }

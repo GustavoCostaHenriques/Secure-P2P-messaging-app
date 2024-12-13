@@ -28,7 +28,8 @@ public class App {
             String[] parts = args[0].split("_");
             String userId = parts[1];
             System.out.println("Clearing all cloud data...");
-            CloudCleaner.main(new String[] { userId }); //
+            CloudCleaner.main(new String[] { userId }); // Calls CloudCleaner class ( class responsible for cleaning the
+                                                        // cloud)
             System.out.println("Cloud data cleared successfully.");
 
             return; // Leaves application after cleaning data

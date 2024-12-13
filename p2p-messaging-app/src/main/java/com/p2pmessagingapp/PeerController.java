@@ -6,7 +6,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -75,7 +74,6 @@ public class PeerController {
             @RequestParam("id") String id,
             @RequestParam("port") String port,
             @RequestParam("ip") String ip,
-            @RequestParam(value = "topics", required = false) List<String> topics,
             Model model) {
 
         String[] client_values = new String[3];
@@ -85,7 +83,7 @@ public class PeerController {
 
         Peer peer = new Peer();
         try {
-            peer.startPeer(client_values, topics); // Initializes the peer with provided values
+            peer.startPeer(client_values); // Initializes the peer with provided values
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -127,13 +125,11 @@ public class PeerController {
         String userId = peer.getValues()[0];
         String userPort = peer.getValues()[1];
         String userIp = peer.getValues()[2];
-        List<String> userInterests = peer.getInterests();
 
         // Pass peer details to the model for display in the menu
         model.addAttribute("userId", userId);
         model.addAttribute("userPort", userPort);
         model.addAttribute("userIp", userIp);
-        model.addAttribute("userInterests", userInterests);
 
         // Load all previous chats with contacts and add them to the model
         List<String> contacts = new ArrayList<>();
@@ -225,34 +221,6 @@ public class PeerController {
     }
 
     /**
-     * Loads the chat history of a group.
-     * 
-     * @param peerId    The ID of the peer requesting the chat history.
-     * @param groupName The name of the field whose chat history is requested.
-     * @return A list of messages between all the peers in this group.
-     */
-    @GetMapping("/loadGroupChat")
-    @ResponseBody
-    public List<String> loadGroupChat(@RequestParam("peerId") String peerId,
-            @RequestParam("groupName") String groupName) {
-        Peer peer = peerMap.get(peerId);
-        List<String> messagesToString = new ArrayList<>();
-        if (peer != null) {
-            List<Message> messages = peer.getMessageGroupHistory();
-
-            for (Message message : messages) {
-                if (message.getFieldName().equals(groupName)) {
-                    String messageToString = message.getTime() + "-" + "[" + message.getSender().getId() + "] "
-                            + message.getContent();
-                    messagesToString.add(messageToString);
-                }
-            }
-        }
-
-        return messagesToString; // Return the list of messages
-    }
-
-    /**
      * Sends a message to a specified contact if they are available.
      * 
      * @param peerId      The ID of the peer sending the message.
@@ -306,65 +274,12 @@ public class PeerController {
 
         for (Message message : messagesFound) {
             String messageToString = message.getTime() + "-" + "[" + message.getSender().getId() + ","
-                    + message.getFieldName() + "] " + message.getContent();
+                    + message.getReceiver().getId() + "] "
+                    + message.getContent();
             messagesToString.add(messageToString);
         }
 
         return messagesToString;
-    }
-
-    /**
-     * Sends a message to a specified contact if they are available.
-     * 
-     * @param peerId    The ID of the peer sending the message.
-     * @param groupName The name of the group to receive the message.
-     * @param message   The message content.
-     * @return A status message indicating success or failure in sending the
-     *         message.
-     */
-    @PostMapping("/sendGroupMessage")
-    @ResponseBody
-    public String sendGroupMessage(@RequestParam("peerId") String peerId,
-            @RequestParam("groupName") String groupName,
-            @RequestParam("message") String message) throws InterruptedException {
-        Peer peer = peerMap.get(peerId);
-        List<User> allUsers = null;
-        try {
-            allUsers = peer.getAllUsers();
-        } catch (Exception e) {
-        }
-        // Wait until the receiver's status is known
-        while (allUsers == null) {
-            try {
-                Thread.sleep(1000); // Wait 1 second before retrying
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        peer.broadcast(message, groupName); // Send the message to all the users
-        return "success"; // Return success status
-    }
-
-    /**
-     * Changes interests of the peer.
-     * 
-     * @param peerId The ID of the peer to be changed.
-     * @return sucess
-     */
-    @PostMapping("/saveChanges")
-    @ResponseBody
-    public String saveChanges(
-            @RequestParam("peerId") String peerId,
-            @RequestBody Map<String, List<String>> topicsMap) {
-        Peer peer = peerMap.get(peerId);
-
-        List<String> topics = topicsMap.get("topics");
-        if (topics.size() == 0)
-            topics = null;
-        if (peer != null)
-            peer.setInterests(topics);
-
-        return "success";
     }
 
     /**

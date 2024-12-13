@@ -7,15 +7,12 @@ import java.io.InputStream;
 import java.io.ObjectOutputStream;
 
 import java.net.SocketException;
-import java.security.Key;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-
-import java.util.List;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -35,8 +32,6 @@ public final class PeerServer extends Thread {
     private PeerHandler peerHandler;
     private boolean serverCreated = false;
     private User userSearched = null; // user that this peer is trying to find
-    private List<User> allUsers = null; // all the users that exist
-    private String groupNameEncrypted = null; // the encrypted group name that this peer wants to send a message in
 
     /**
      * Constructs a PeerServer instance that creates an SSL server socket on the
@@ -146,25 +141,13 @@ public final class PeerServer extends Thread {
      */
     public void sendMessage(Message message) throws Exception {
         Peer peerInstance = new Peer(message.getReceiver().getId(), message.getReceiver().getIp(),
-                message.getReceiver().getPort(), message.getReceiver().getInterests(), message.getSender()); // Create a
-                                                                                                             // Peer
-                                                                                                             // instance
-                                                                                                             // for the
-                                                                                                             // receiver
+                message.getReceiver().getPort(), message.getSender()); // Create a Peer instance for the receiver
         byte[] serializedMessage = serializeMessage(message); // Serialize the message
         peerInstance.sendMessage(serializedMessage); // Send the serialized message to the peer
     }
 
     public void addMessageToPeer(Message message) {
         peer.addMessageToHistory(message);
-    }
-
-    public void addMessageGroupToPeer(Message message) {
-        peer.addMessageGroupToHistory(message);
-    }
-
-    public void setGroupKeyToPeer(Key groupKey) {
-        peer.setGroupKey(peer, groupKey);
     }
 
     public void uploadCloudPeer(String objectKey, String content) {
@@ -210,52 +193,5 @@ public final class PeerServer extends Thread {
      */
     public void setUserSearched(User user) {
         this.userSearched = user;
-    }
-
-    /**
-     * Gets the list of all the users sent from the server.
-     *
-     * @return The list of all the users sent from the server.
-     */
-    public List<User> getAllUsers() {
-        return allUsers;
-    }
-
-    /**
-     * Sets the list of all the users to the list users.
-     * 
-     * @param user The list pf alll the users that is going to replace the value of
-     *             allUsers.
-     */
-    public void setAllUsers(List<User> users) {
-        this.allUsers = users;
-    }
-
-    /**
-     * Gets the groupNameEncrypted from the server.
-     *
-     * @return The groupNameEncrypted sent from the server.
-     */
-    public String getGroupNameEncrypted() {
-        return groupNameEncrypted;
-    }
-
-    /**
-     * Sets the groupNameEncrypted to the string groupNameEncrypted.
-     * 
-     * @param groupNameEncrypted The groupNameEncrypted string that is going to be
-     *                           store in the variable groupNameEncrypted.
-     */
-    public void setGroupNameEncrypted(String NameEncrypted) {
-        this.groupNameEncrypted = NameEncrypted;
-    }
-
-    /**
-     * Gets the group key of this peer.
-     *
-     * @return The group key of this peer.
-     */
-    public Key getPeerKey() {
-        return peer.getGroupKey();
     }
 }
